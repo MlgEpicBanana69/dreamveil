@@ -77,6 +77,8 @@ class Blockchain:
     @staticmethod
     def flatten_timelines(timelines):
         """Flattens the timelines data-structure and returns a list of all complete timeline possibilities to be iterated upon"""
+        # Smallest 
+        
         if len(timelines) == 0:
             return timelines
 
@@ -85,17 +87,18 @@ class Blockchain:
             prefix.append(timelines.pop(0))
 
         if len(timelines) == 0:
-            return prefix
+            return [prefix]
 
         output = []
         for timeline in timelines[0]:
             next_recursion = Blockchain.flatten_timelines(timeline)
-            output.append(prefix + next_recursion)
+            for branch in next_recursion:
+                output.append(prefix + branch)
         return output
 
 if __name__ == '__main__':
     initial_block = Block(None)
     x = [1, 2, 3, 4, [[[5, 6], [7, [8, [80, 90]]]], [9, 10, 90]], [[11, 12, 13, 14], [15, 16]]]
-    x = [1, 2, 3, 4, [[5, 6, [[10, 20], [30, 40]]], [7, 8]]]
+    x = [1, 2, 3, 4, [[5, 6, [[10, 20, 50], [30, 40]]], [7, 8]]]
     y = Blockchain.flatten_timelines(x)
     print(y)
