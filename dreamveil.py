@@ -26,11 +26,10 @@ class Transactions:
             return False
 
 class Block:
-    def __init__(self, previous_sign):
-        self.nonce = None
+    def __init__(self, previous_sign=None, transactions=None):
         self.signature = None
         self.previous_sign = previous_sign
-        self.transactions = Transactions()
+        self.transactions = Transactions() if not transactions else transactions
 
     def add_transaction(self, transaction:Transaction):
         assert self.signature is None
@@ -48,11 +47,14 @@ class Block:
         assert self.signature is None
         # TODO Make a sign function using hashes
         self.signature = self.read_block()
+        return self
 
     def get_signature(self):
         return self.signature
 
 class Blockchain:
+    GENESIS_BLOCK = Block(None).sign()
+
     @staticmethod
     def verify_blocks(block1:Block, block2:Block):
         """Verfies whether chaining two blocks block1 U block2 is valid"""
@@ -102,7 +104,7 @@ class Blockchain:
                 if Blockchain.verify_blocks(timeline[i], block):
                     # Branch out from existing timeline
                     if i < len(timeline)-1:
-                        splitted_timelines.append(timeline[:i:] + [block])
+                        splitted_timelines.asppend(timeline[:i:] + [block])
                     # Block is to be appended at the end of an existing timeline
                     # the block continues said timeline
                     else:
@@ -110,9 +112,7 @@ class Blockchain:
                     # Breaking means a block was appeneded succesfuly
                     break
         else:
-            # Create an entirely new timeline
-            splitted_timelines.append(block)
-        
+            raise ValueError(f"Block {block} does chain anywhere")
         # Stitch the splitted timelines together
         output = []
         splitted_timelines = sorted(splitted_timelines, len)
