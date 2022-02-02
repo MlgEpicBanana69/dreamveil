@@ -1,8 +1,6 @@
 import Crypto
 import hashlib
 
-
-
 class Transaction:
     # Idealy this data form will support currency transaction and amongst other generic
     # item transactions (NFTs)?
@@ -75,10 +73,9 @@ class Blockchain:
                     raise NotImplementedError()
 
     @staticmethod
-    def flatten_timelines(timelines):
+    def split_timelines(timelines):
         """Flattens the timelines data-structure and returns a list of all complete timeline possibilities to be iterated upon"""
-        # Smallest 
-        
+        # Largest dynamic subproblem in form of [A, [[B], [C, [D, E]]]]
         if len(timelines) == 0:
             return timelines
 
@@ -91,14 +88,43 @@ class Blockchain:
 
         output = []
         for timeline in timelines[0]:
-            next_recursion = Blockchain.flatten_timelines(timeline)
+            next_recursion = Blockchain.split_timelines(timeline)
             for branch in next_recursion:
                 output.append(prefix + branch)
         return output
+
+    @staticmethod
+    def append_to_timelines(timelines, block:Block):
+        """returns given timelines with the given block appened to it"""
+        splitted_timelines = Blockchain.split_timelines(timelines)
+        for i in range(len(max(splitted_timelines, len))):
+            for j, timeline in enumerate(splitted_timelines):
+                if Blockchain.verify_blocks(timeline[i], block):
+                    # Branch out from existing timeline
+                    if i < len(timeline)-1:
+                        splitted_timelines.append(timeline[:i:] + [block])
+                    # Block is to be appended at the end of an existing timeline
+                    # the block continues said timeline
+                    else:
+                        splitted_timelines[j].append(block)
+                    # Breaking means a block was appeneded succesfuly
+                    break
+        else:
+            # Create an entirely new timeline
+            splitted_timelines.append(block)
+        
+        # Stitch the splitted timelines together
+        output = []
+        splitted_timelines = sorted(splitted_timelines, len)
+        max_timeline_length = max(splitted_timelines, len)
+        #for i in range(max_timeline_length):
+        #    for timeline in splitted_timelines:
+        #        if len(timeline)-1 < 
 
 if __name__ == '__main__':
     initial_block = Block(None)
     x = [1, 2, 3, 4, [[[5, 6], [7, [8, [80, 90]]]], [9, 10, 90]], [[11, 12, 13, 14], [15, 16]]]
     x = [1, 2, 3, 4, [[5, 6, [[10, 20, 50], [30, 40]]], [7, 8]]]
-    y = Blockchain.flatten_timelines(x)
+    y = Blockchain.split_timelines(x)
+    print(sorted(y, key=len))
     print(y)
