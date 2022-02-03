@@ -57,7 +57,7 @@ class Blockchain:
 
     @staticmethod
     def verify_blocks(block1:Block, block2:Block):
-        """Verfies whether chaining two blocks block1 U block2 is valid"""
+        """Verfies whether chaining two blocks block1 <U< block2 is valid"""
         # TODO implement hash signatures
         return block2.previous_signature == block1.get_signature()
 
@@ -65,61 +65,18 @@ class Blockchain:
     def verify_signature(block:Block, signature):
         return block.get_signature() == signature
 
-    def __init__(self, initial_block:Block):
-        self.timelines = [[initial_block]]
+    def __init__(self):
+        self.timeline = [Blockchain.GENESIS_BLOCK]
 
     def chain_block(self, block:Block):
-        for timeline in self.timelines:
-            if timeline[-1].get_signature() == block.previous_sign:
-                if Blockchain.verify_sign(block.get_signature(), block.read_block()):
-                    raise NotImplementedError()
+        """Chains a block to the blockchain, only blocks that are considered trusted are to be chained"""
+        if Blockchain.verify_blocks(self.timeline[-1], block):
+            # The block chains to the blockchain
+            self.timeline.append(block)
+            return True # Block was chained successfully
+        return False # Could not chain block anywhere.
 
-    @staticmethod
-    def split_timelines(timelines):
-        """Flattens the timelines data-structure and returns a list of all complete timeline possibilities to be iterated upon"""
-        # Largest dynamic subproblem in form of [A, [[B], [C, [D, E]]]]
-        if len(timelines) == 0:
-            return timelines
 
-        prefix = []
-        while len(timelines) > 0 and type(timelines[0]) != list:
-            prefix.append(timelines.pop(0))
-
-        if len(timelines) == 0:
-            return [prefix]
-
-        output = []
-        for timeline in timelines[0]:
-            next_recursion = Blockchain.split_timelines(timeline)
-            for branch in next_recursion:
-                output.append(prefix + branch)
-        return output
-
-    @staticmethod
-    def append_to_timelines(timelines, block:Block):
-        """returns given timelines with the given block appened to it"""
-        splitted_timelines = Blockchain.split_timelines(timelines)
-        for i in range(len(max(splitted_timelines, len))):
-            for j, timeline in enumerate(splitted_timelines):
-                if Blockchain.verify_blocks(timeline[i], block):
-                    # Branch out from existing timeline
-                    if i < len(timeline)-1:
-                        splitted_timelines.asppend(timeline[:i:] + [block])
-                    # Block is to be appended at the end of an existing timeline
-                    # the block continues said timeline
-                    else:
-                        splitted_timelines[j].append(block)
-                    # Breaking means a block was appeneded succesfuly
-                    break
-        else:
-            raise ValueError(f"Block {block} does chain anywhere")
-        # Stitch the splitted timelines together
-        output = []
-        splitted_timelines = sorted(splitted_timelines, len)
-        max_timeline_length = max(splitted_timelines, len)
-        #for i in range(max_timeline_length):
-        #    for timeline in splitted_timelines:
-        #        if len(timeline)-1 < 
 
 if __name__ == '__main__':
     initial_block = Block(None)
