@@ -11,32 +11,17 @@ class Transaction:
     def __repr__(self):
         return self.content
 
-class Transactions:
-    def __init__(self):
-        self.transactions = []
-
-    def add(self, transaction:Transaction):
-        self.transactions.append(transaction)
-
-    def remove(self, transaction):
-        if transaction in self.transactions:
-            del self.transactions[self.transactions.index(transaction)]
-            return True
-        else:
-            return False
-
 class Block:
-    def __init__(self, previous_sign=None, transactions=None):
+    def __init__(self, previous_sign=None):
         self.signature = None
         self.previous_sign = previous_sign
-        self.transactions = Transactions() if not transactions else transactions
+        self.transactions = []
+        self.nonce = 0
 
     def add_transaction(self, transaction:Transaction):
-        assert self.signature is None
-        self.transactions.add(transaction)
+        self.transactions.append(transaction)
 
     def remove_transaction(self, transaction:Transaction):
-        assert self.signature is None
         self.transactions.remove(transaction)
 
     def read_block(self):
@@ -44,7 +29,6 @@ class Block:
         return str(self.transactions)
 
     def sign(self):
-        assert self.signature is None
         # TODO Make a sign function using hashes
         self.signature = self.read_block()
         return self
