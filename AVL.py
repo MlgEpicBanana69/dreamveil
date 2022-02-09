@@ -55,7 +55,6 @@ class AVL:
             self.tree = out
         return out
 
-
     def get_height(self, root):
         if root is None:
             return 0
