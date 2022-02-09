@@ -1,6 +1,8 @@
 import Crypto
 import hashlib
 
+from AVL import avl
+
 class Transaction:
     # Idealy this data form will support currency transaction and amongst other generic
     # item transactions (NFTs)?
@@ -59,13 +61,3 @@ class Blockchain:
             self.timeline.append(block)
             return True # Block was chained successfully
         return False # Could not chain block anywhere.
-
-
-
-if __name__ == '__main__':
-    initial_block = Block(None)
-    x = [1, 2, 3, 4, [[[5, 6], [7, [8, [80, 90]]]], [9, 10, 90]], [[11, 12, 13, 14], [15, 16]]]
-    x = [1, 2, 3, 4, [[5, 6, [[10, 20, 50], [30, 40]]], [7, 8]]]
-    y = Blockchain.split_timelines(x)
-    print(sorted(y, key=len))
-    print(y)
