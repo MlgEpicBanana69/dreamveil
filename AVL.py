@@ -85,15 +85,3 @@ class AVL:
 
     def get_balance(self, root):
         return self.get_height(root.right) - self.get_height(root.left)
-
-if __name__ == '__main__':
-    avl = AVL()
-    avl.insert(avl.tree, 1)
-    avl.insert(avl.tree, 10)
-    avl.insert(avl.tree, 15)
-    avl.insert(avl.tree, 20)
-    avl.insert(avl.tree, 13)
-    avl.insert(avl.tree, 6)
-    avl.insert(avl.tree, 25)
-    avl.find(avl.tree, 20)
-    print("test")
