@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="fviBirB7tDY4xXm6blDv" name="Page-1">
-        <mxGraphModel dx="1061" dy="472" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="690" dy="245" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -31,7 +31,7 @@
                 <mxCell id="JLN3XP2RZJJQToGExsw7-1" value="Nonce" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="270" y="140" width="340" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="9" value="Miner Tax Transaction" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" vertex="1" parent="1">
+                <mxCell id="9" value="Miner Tax Transaction" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" parent="1" vertex="1">
                     <mxGeometry x="317.5" y="171" width="245" height="35" as="geometry"/>
                 </mxCell>
             </root>
