@@ -3,6 +3,10 @@ import random
 
 from AVL import AVL
 
+class TransactionRecord:
+    def __init__(wallet, value):
+        raise NotImplementedError()
+
 class Transaction:
     def __init__(self, sender, receiver, value, miner_fee=0):
         # TODO Digital Signatures
@@ -143,7 +147,7 @@ class Blockchain:
 
     def __init__(self):
         self.chain = [Blockchain.GENESIS_BLOCK]
-        self.crt_tree = AVL()
+        self.currency_tree = AVL()
         self.nft_tree = AVL()
 
     def chain_block(self, block:Block):
@@ -151,3 +155,6 @@ class Blockchain:
         if self.chain[-1].sign == block.previous_sign:
                 # The block chains to the blockchain
                 self.chain.append(block)
+                for transaction in block.transactions:
+                    if type(transaction) == "crt" or type(transaction) == "fee":
+                        self.currency_tree.insert()
