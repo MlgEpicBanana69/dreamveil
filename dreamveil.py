@@ -1,4 +1,5 @@
 import Crypto
+import hashlib
 import random
 
 from cv2 import add
@@ -96,6 +97,7 @@ class Block:
         self.height = height
         self.transactions = []
         self.nonce = 0
+        self.data = bytes()
 
     def add_transaction(self, transaction:Transaction):
         self.transactions.append(transaction)
@@ -105,11 +107,11 @@ class Block:
 
     def read_block(self):
         # TODO: Make a better database method
-        return str(self.transactions)
+        return bytes(self.transactions)
 
     def sign(self):
         # TODO Make a sign function using hashes
-        self.signature = self.read_block()
+        self.signature = hashlib.sha256(self.read_block())
         return self
 
     def verify_block(self):
