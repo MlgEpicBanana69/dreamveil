@@ -1,25 +1,26 @@
-import Crypto
+from Crypto.PublicKey import RSA
+import json
 import hashlib
 import random
 
 import data_structures
 
 class Transaction:
-    def __init__(self, sender, receiver, value, miner_fee=0):
+    # Once a transaction object is initiated it is assumed all of its values are valid
+    # except the signature, which needs to be manually verified using verify_signature()
+    def __init__(self, sender, receiver, miner_fee, nonce, value, signature):
         # TODO Digital Signatures
         self.sender = sender
         self.receiver = receiver
-        self.nonce = random.randint(0, 2**64) # Roll a random nonce
-        self.signature = None
-        self.value = value
+        self.nonce = nonce
         self.miner_fee = miner_fee
-        # TODO: Create a defined data format for transactions (Possibly json?)
-        self.data = str(value)
+        self.value = value
+        self.signature = signature
 
         # type_prefix
         # Transaction type must be a three letter string
         # crt - currency transaction, this type is for transactions of cryptocurrency
-        # fee - initial block transaction, reciever is the miner who mined the block.
+        # fee - initial block transaction, receiver is the miner who mined the block.
         #       The validity of this transaction is rooted in the validity of its block
         # nft - non-fungible token, this type is for media proof of ownership
         # gnd - generic data, this has no special propeties aside from the fact that it is not filtered
@@ -29,21 +30,43 @@ class Transaction:
     # p_key: the private key that is paired with the sender wallet
     def digital_sign(self, p_key):
         # TODO Implement digital signing
-        assert self.data is not None
         # Temporary non-cryptographic signing (To be replaced)
         self.signature = str(self.data) + str(self.sender)
 
     def __repr__(self):
-        return self.data
+        return self.json_dumps_transaction()
 
-    def verify_transaction(self):
+    def verify_signature(self):
         # TODO Implement digital signature verifying.
         # Temporary non-cryptographic method (To be replaced)
-        return self.signature == str(self.data) + str(self.sender)
+        return self.signature == hashlib.sha256
+
+    @staticmethod
+    def json_loads_transaction(json_str:str):
+        try:
+            information = json.loads(json_str)
+            assert type(information) == list
+            assert len(information) == 7
+            if information[0] == "crt":
+                transaction_object = CurrencyTransaction(*information)
+            elif information[0] == "nft":
+                transaction_object = NftTransaction(*information)
+            elif information[0] == "gnd":
+                transaction_object = DataTransaction(*information)
+            else:
+                raise ValueError("Invalid type prefix in JSON. Possibly corrupt data")
+            return transaction_object
+        except Exception as err:
+            print("Failed to create Transaction object from JSON. (Invalid data")
+            raise err
+
+    def json_dumps_transaction(self):
+        information = [self.type_prefix, self.sender, self.receiver, self.miner_fee, self.nonce, self.value, self.signature]
+        return json.dumps(information)
 
 class CurrencyTransaction(Transaction):
-    def __init__(self, sender, reciever, value:int, miner_fee:int):
-        super().__init__(sender, reciever, value, miner_fee)
+    def __init__(self, sender, receiver, value:int, miner_fee:int):
+        super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "crt"
 
     def verify_transaction(self):
@@ -54,24 +77,23 @@ class CurrencyTransaction(Transaction):
         except ValueError:
             return False
 
-
     def get_value(self):
-        return int(self.data)
+        return self.value
 
 class NftTransaction(Transaction):
-    def __init__(self, sender, reciever, value:int, miner_fee=0):
-        super().__init__(sender, reciever, value, miner_fee)
+    def __init__(self, sender, receiver, value:int, miner_fee:int):
+        super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "nft"
 
     def verify_transaction(self):
         if not super().verify_transaction():
             return False
     def get_value(self):
-        return self.data
+        return self.value
 
 class DataTransaction(Transaction):
-    def __init__(self, sender, reciever, data:str):
-        super().__init__(sender, reciever, data)
+    def __init__(self, sender, receiver, value:str, miner_fee:int):
+        super().__init__(sender, receiver, value, miner_fee)
 
         self.type_prefix = "gnd"
 
@@ -83,7 +105,7 @@ class DataTransaction(Transaction):
         return True
 
     def get_value(self):
-        return self.data
+        return self.value
 
 class Block:
     MAX_TRANSACTIONS_LENGTH = 727
@@ -144,7 +166,7 @@ class Blockchain:
     TRUST_HEIGHT = 10
     WALLET_RECORD_TEMPLATE = {"crt": [], "nft": [], "gnd": []}
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
-    BLOCK_REWARD_SEASON = (365*24*60*60/AVERAGE_TIME_PER_BLOCK) / 2 # 52560
+    BLOCK_REWARD_SEASON = (0.5*365*24*60*60/AVERAGE_TIME_PER_BLOCK) # 52560
     BLOCK_INITIAL_REWARD = 727
     BLOCK_REWARD_SUM = BLOCK_REWARD_SEASON * BLOCK_INITIAL_REWARD * 2 # 76422240
 
@@ -178,7 +200,7 @@ class Blockchain:
             # TODO: CONTINUE FROM HERE!!!
             transactions = self.blockchain[-1].transactions
             # miner fees
-            transactions.insert(0, CurrencyTransaction(None, self.reciever, self.calculate_block_reward(block)))
+            transactions.insert(0, CurrencyTransaction(None, self.receiver, self.calculate_block_reward(block)))
             for i, transaction in enumerate(transactions):
                 if transaction.sender:
                     wallet_records = self.transaction_tree.find(transaction.sender)
@@ -193,7 +215,7 @@ class Blockchain:
                     self.transaction_tree.insert(self.transaction_tree, wallet_records)
 
                 if transaction.receiver:
-                    wallet_records = self.transaction_tree.find(transaction.reciever)
+                    wallet_records = self.transaction_tree.find(transaction.receiver)
                     if wallet_records is not None:
                         records = wallet_records.value
                     else:
@@ -232,4 +254,7 @@ class Blockchain:
 
 # debugging
 if __name__ == '__main__':
-    pass
+    # t = CurrencyTransaction("a", "b", 1, 0)
+    with open("transaction_dumps_example.json", "r") as amogus:
+       t = Transaction.json_loads_transaction(amogus.read())
+    print(t)
