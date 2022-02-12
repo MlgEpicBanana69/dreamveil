@@ -2,10 +2,7 @@ import Crypto
 import hashlib
 import random
 
-from cv2 import add
-
 import data_structures
-
 
 class Transaction:
     def __init__(self, sender, receiver, value, miner_fee=0):
@@ -25,7 +22,7 @@ class Transaction:
         # fee - initial block transaction, reciever is the miner who mined the block.
         #       The validity of this transaction is rooted in the validity of its block
         # nft - non-fungible token, this type is for media proof of ownership
-        # gnd - generic data, this has no special propeties
+        # gnd - generic data, this has no special propeties aside from the fact that it is not filtered
         self.type_prefix = None
 
     # Create a digital signature for the transaction
@@ -100,9 +97,11 @@ class Block:
         self.data = bytes()
 
     def add_transaction(self, transaction:Transaction):
+        self.nonce = 0
         self.transactions.append(transaction)
 
     def remove_transaction(self, transaction:Transaction):
+        self.nonce = 0
         self.transactions.remove(transaction)
 
     def read_block(self):
@@ -112,7 +111,7 @@ class Block:
     def sign(self):
         # TODO Make a sign function using hashes
         self.signature = hashlib.sha256(self.read_block())
-        return self
+        return self.signature
 
     def verify_block(self):
         for transaction in self.transactions:
@@ -179,7 +178,7 @@ class Blockchain:
             # TODO: CONTINUE FROM HERE!!!
             transactions = self.blockchain[-1].transactions
             # miner fees
-            transactions.insert(0, Transaction(None, self.reciever, self.calculate_block_reward(block)))
+            transactions.insert(0, CurrencyTransaction(None, self.reciever, self.calculate_block_reward(block)))
             for i, transaction in enumerate(transactions):
                 if transaction.sender:
                     wallet_records = self.transaction_tree.find(transaction.sender)
@@ -231,5 +230,6 @@ class Blockchain:
             block_reward += transaction.miner_fee
         return block_reward
 
+# debugging
 if __name__ == '__main__':
     pass
