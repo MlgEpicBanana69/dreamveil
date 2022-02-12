@@ -1,5 +1,7 @@
-class tree_node:
-    def __init__(self, value):
+# A binary node that can store a value seperate from its key
+class binary_tree_node:
+    def __init__(self, key, value=None):
+        self.key = key
         self.value = value
         self.left = None
         self.right = None
@@ -9,32 +11,32 @@ class AVL:
     def __init__(self):
         self.tree = None
 
-    def find(self, root, value):
+    def find(self, root, key):
         if root is not None:
-            if value > root.value:
-                return self.find(root.right, value)
-            elif value < root.value:
-                return self.find(root.left, value)
+            if key > root.key:
+                return self.find(root.right, key)
+            elif key < root.key:
+                return self.find(root.left, key)
             else:
                 return root
         else:
-            # Could not find value in tree
+            # Could not find key in tree
             return None
 
-    def insert(self, root, value):
+    def insert(self, root, node:binary_tree_node):
         if self.tree is None:
-            self.tree = tree_node(value)
+            self.tree = node
             return
 
         if root is None:
-            return tree_node(value)
+            return node
 
-        if value > root.value:
-            root.right = self.insert(root.right, value)
-        elif value < root.value:
-            root.left = self.insert(root.left, value)
+        if node.key > root.key:
+            root.right = self.insert(root.right, node.key)
+        elif node.key < root.key:
+            root.left = self.insert(root.left, node.key)
         else:
-            raise ValueError(f"Value {value} already in tree!")
+            raise ValueError(f"key {node.key} already in tree!")
 
         root.height = 1 + max(self.get_height(root.left), self.get_height(root.right))
 
@@ -84,3 +86,25 @@ class AVL:
 
     def get_balance(self, root):
         return self.get_height(root.right) - self.get_height(root.left)
+
+class multifurcasting_node:
+    def __init__(self, key):
+        self.key = key
+        self.children = []
+        self.height = 1
+
+    def calculate_height(self):
+        height_sum = 0
+        for child in self.children:
+            height_sum += child.get_height()
+        self.height = 1 + height_sum
+        return self.height
+
+    def get_highest_child(self):
+        if len(self.children) == 0:
+            return False
+        highest_child = self.children[0]
+        for child in self.children[1::]:
+            if child.height > highest_child.height:
+                highest_child = child
+        return highest_child

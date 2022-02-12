@@ -1,10 +1,14 @@
 import Crypto
 import random
 
-from AVL import AVL
+from cv2 import add
 
-class TransactionRecord:
-    def __init__(wallet, value):
+import data_structures
+
+class WalletRecord:
+    WALLET_RECORD_TEMPLATE = {"crt": [], "nft": [], "gnd": []}
+
+    def __init__(self):
         raise NotImplementedError()
 
 class Transaction:
@@ -61,17 +65,6 @@ class CurrencyTransaction(Transaction):
     def get_value(self):
         return int(self.data)
 
-class FeeTransaction(Transaction):
-    def __init__(self, miner, data:str):
-        super().__init__(miner, miner, data)
-        self.type_prefix = "fee"
-
-    def verify_transaction(self):
-        return super().verify_transaction()
-
-    def get_value(self):
-        return int(self.data)
-
 class NftTransaction(Transaction):
     def __init__(self, sender, reciever, value:int, miner_fee=0):
         super().__init__(sender, reciever, value, miner_fee)
@@ -101,9 +94,12 @@ class DataTransaction(Transaction):
         return self.data
 
 class Block:
-    def __init__(self, previous_sign, difficulty):
+    MAX_TRANSACTIONS_LENGTH = 727
+
+    def __init__(self, previous_sign, height, difficulty):
         self.signature = None
         self.previous_sign = previous_sign
+        self.height = height
         self.transactions = []
         self.nonce = 0
         self.difficulty = None
@@ -129,32 +125,89 @@ class Block:
                 return False
 
         currency_transactions = [crt for crt in self.transactions if type(crt) == CurrencyTransaction]
-        for sender in [crt.sender for crt in currency_transactions]:
-            if currency_transactions.count(sender) != 1:
+        if len(currency_transactions) == 0 or len(currency_transactions) > Block.MAX_TRANSACTIONS_LENGTH:
+            return False
+        currency_transactions_senders = [crt.sender for crt in currency_transactions]
+        for sender in currency_transactions_senders:
+            if currency_transactions_senders.count(sender) != 1:
                 return False
-        fee_transactions = [fee for fee in self.transactions if type(fee) == FeeTransaction]
-        if len(fee_transactions) != 1:
-            return False
 
-        valid_reward = sum([crt.miner_tax for crt in currency_transactions])
+        #miner_reward = sum([crt.miner_fee for crt in currency_transactions])
         # TODO: Add changing difficulty block reward
-        valid_reward += 50 # Dummy block difficulty reward
-        if fee_transactions[0].value != valid_reward:
+        #miner_reward += 50 # Dummy block difficulty reward
+        return True
+
+    def do_blocks_chain(self, antecedent_block):
+        """Checks if antecedent_block << self is a valid chain"""
+        if antecedent_block.signature != self.previous_sign:
             return False
+        if antecedent_block.height != self.height+1:
+            return False
+        return True
+
 
 class Blockchain:
     GENESIS_BLOCK = Block(None).sign()
+    TRUST_HEIGHT = 10
 
     def __init__(self):
         self.chain = [Blockchain.GENESIS_BLOCK]
-        self.currency_tree = AVL()
-        self.nft_tree = AVL()
+        self.transaction_tree = data_structures.AVL()
+        self.untrusted_timeline = data_structures.multifurcasting_node(self.chain[-1])
 
     def chain_block(self, block:Block):
-        """Chains a block to the blockchain, only blocks that are considered trusted are to be chained"""
-        if self.chain[-1].sign == block.previous_sign:
-                # The block chains to the blockchain
-                self.chain.append(block)
-                for transaction in block.transactions:
-                    if type(transaction) == "crt" or type(transaction) == "fee":
-                        self.currency_tree.insert()
+        """Tries to chain a block to the blockchain. This function succeeds only if a block is valid.
+        Valid blocks first move into the untrusted timeline.
+        The block is chained to the blockchain once it reaches TRUST_HEIGHT in the untrusted timeline
+        On success returns True. Returns False otherwise"""
+        if not self.verify_block(block):
+            # Block is invalid
+            return False
+        if not self.add_block_to_untrusted_timeline(self.untrusted_timeline, block):
+            # Block is unrelated to the main chain
+            # TODO: Check/show that block(x+1) cannot practically arrive before block(x)
+            return False
+
+        if self.untrusted_timeline.calculate_height() == Blockchain.TRUST_HEIGHT+1:
+            # Untrusted block has a TRUST_HEIGHT timeline
+            # Block is chained into the blockchain since it can now be trusted
+            newly_trusted_block_node = self.untrusted_timeline.get_highest_child()
+            self.blockchain.append(newly_trusted_block_node.key)
+            # Remove the now trusted block from the timeline and advance on its timeline
+            self.untrusted_timeline = newly_trusted_block_node
+
+            # Record all of the transactions in the newly added block in the transaction AVL tree
+            # TODO: CONTINUE FROM HERE!!!
+            #for transaction in self.blockchain[-1].transactions:
+            #    wallet_records = self.transaction_tree.find(transaction.sender)
+            #    if wallet_records is None:
+            #        new_record = Blockchain.WALLET_RECORD_TEMPLATE
+            #        new_record[transaction.type_prefix].append((transaction.value, self.blockchain[-1].height))
+            #        transaction_record = data_structures.binary_tree_node(transaction.sender, new_record)
+            #        self.transaction_tree.insert(transaction_record)
+            #    else:
+            #        pass
+        #if self.chain[-1].sign == block.previous_sign:
+        #        # The block chains to the blockchain
+        #        self.chain.append(block)
+        #        for transaction in block.transactions:
+        #            if type(transaction) == "crt" or type(transaction) == "fee":
+        #                self.currency_tree.insert()
+
+    def add_block_to_untrusted_timeline(self, root, block):
+        if block.do_blocks_chain(root.key):
+            next_node = data_structures.multifurcasting_node(block)
+            root.children.append(next_node)
+            return True
+        for child in root.children:
+            if self.add_block_to_untrusted_timeline(child, block):
+                return True
+        return False
+
+    def verify_block(self, block):
+        """Checks if a block is entirely authentic, including its contents (transactions) and their complete validity"""
+        raise NotImplementedError()
+
+
+if __name__ == '__main__':
+    pass
