@@ -5,11 +5,6 @@ from cv2 import add
 
 import data_structures
 
-class WalletRecord:
-    WALLET_RECORD_TEMPLATE = {"crt": [], "nft": [], "gnd": []}
-
-    def __init__(self):
-        raise NotImplementedError()
 
 class Transaction:
     def __init__(self, sender, receiver, value, miner_fee=0):
@@ -85,10 +80,9 @@ class DataTransaction(Transaction):
     def verify_transaction(self):
         if not super().verify_transaction():
             return False
-        try:
-            int(self.data)
-        except ValueError:
+        if len(self.data) == 0 or len(self.data) > 140:
             return False
+        return True
 
     def get_value(self):
         return self.data
@@ -96,13 +90,12 @@ class DataTransaction(Transaction):
 class Block:
     MAX_TRANSACTIONS_LENGTH = 727
 
-    def __init__(self, previous_sign, height, difficulty):
+    def __init__(self, previous_sign, height):
         self.signature = None
         self.previous_sign = previous_sign
         self.height = height
         self.transactions = []
         self.nonce = 0
-        self.difficulty = None
 
     def add_transaction(self, transaction:Transaction):
         self.transactions.append(transaction)
@@ -145,10 +138,14 @@ class Block:
             return False
         return True
 
-
 class Blockchain:
-    GENESIS_BLOCK = Block(None).sign()
+    GENESIS_BLOCK = Block(None, 0).sign()
     TRUST_HEIGHT = 10
+    WALLET_RECORD_TEMPLATE = {"crt": [], "nft": [], "gnd": []}
+    AVERAGE_TIME_PER_BLOCK = 300 # in seconds
+    BLOCK_REWARD_SEASON = (365*24*60*60/AVERAGE_TIME_PER_BLOCK) / 2 # 52560
+    BLOCK_INITIAL_REWARD = 727
+    BLOCK_REWARD_SUM = BLOCK_REWARD_SEASON * BLOCK_INITIAL_REWARD * 2 # 76422240
 
     def __init__(self):
         self.chain = [Blockchain.GENESIS_BLOCK]
@@ -178,21 +175,33 @@ class Blockchain:
 
             # Record all of the transactions in the newly added block in the transaction AVL tree
             # TODO: CONTINUE FROM HERE!!!
-            #for transaction in self.blockchain[-1].transactions:
-            #    wallet_records = self.transaction_tree.find(transaction.sender)
-            #    if wallet_records is None:
-            #        new_record = Blockchain.WALLET_RECORD_TEMPLATE
-            #        new_record[transaction.type_prefix].append((transaction.value, self.blockchain[-1].height))
-            #        transaction_record = data_structures.binary_tree_node(transaction.sender, new_record)
-            #        self.transaction_tree.insert(transaction_record)
-            #    else:
-            #        pass
-        #if self.chain[-1].sign == block.previous_sign:
-        #        # The block chains to the blockchain
-        #        self.chain.append(block)
-        #        for transaction in block.transactions:
-        #            if type(transaction) == "crt" or type(transaction) == "fee":
-        #                self.currency_tree.insert()
+            transactions = self.blockchain[-1].transactions
+            # miner fees
+            transactions.insert(0, Transaction(None, self.reciever, self.calculate_block_reward(block)))
+            for i, transaction in enumerate(transactions):
+                if transaction.sender:
+                    wallet_records = self.transaction_tree.find(transaction.sender)
+                    if wallet_records is not None:
+                        records = wallet_records.value
+                    else:
+                        records = Blockchain.WALLET_RECORD_TEMPLATE
+                    # New record (|value|, polarity, block index, transaction index)
+                    # negativity - if a transaction is negative (1) or positive (0).
+                    records[transaction.type_prefix].append((transaction.value, 1, block.height, i))
+                    wallet_records.value = records
+                    self.transaction_tree.insert(self.transaction_tree, wallet_records)
+
+                if transaction.receiver:
+                    wallet_records = self.transaction_tree.find(transaction.reciever)
+                    if wallet_records is not None:
+                        records = wallet_records.value
+                    else:
+                        records = Blockchain.WALLET_RECORD_TEMPLATE
+                    # New record (|value|, polarity, block index, transaction index)
+                    # negativity - if a transaction is negative (1) or positive (0).
+                    records[transaction.type_prefix].append((transaction.value, 0, block.height, i))
+                    wallet_records.value = records
+                    self.transaction_tree.insert(self.transaction_tree, wallet_records)
 
     def add_block_to_untrusted_timeline(self, root, block):
         if block.do_blocks_chain(root.key):
@@ -208,6 +217,17 @@ class Blockchain:
         """Checks if a block is entirely authentic, including its contents (transactions) and their complete validity"""
         raise NotImplementedError()
 
+    def calculate_block_reward(self, block):
+        # We divide block reward in two every 52560 blocks (half a year if 5m per block)
+        # a0 = 727 * 52560 = 38211120
+        # sum of geometric series = 2 * a0 = 76422240
+        # Total currency amount 76 422 240
+        r = 0.5
+        n = block.height // Blockchain.BLOCK_REWARD_SEASON
+        block_reward = Blockchain.BLOCK_INITIAL_REWARD * r**n
+        for transaction in block_reward.transactions:
+            block_reward += transaction.miner_fee
+        return block_reward
 
 if __name__ == '__main__':
     pass

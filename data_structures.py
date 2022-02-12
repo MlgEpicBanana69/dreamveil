@@ -36,7 +36,7 @@ class AVL:
         elif node.key < root.key:
             root.left = self.insert(root.left, node.key)
         else:
-            raise ValueError(f"key {node.key} already in tree!")
+            root.value = node.value
 
         root.height = 1 + max(self.get_height(root.left), self.get_height(root.right))
 
