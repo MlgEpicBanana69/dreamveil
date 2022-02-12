@@ -1,38 +1,41 @@
 <mxfile host="65bd71144e">
     <diagram id="fviBirB7tDY4xXm6blDv" name="Page-1">
-        <mxGraphModel dx="690" dy="245" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="496" dy="155" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
                 <mxCell id="JLN3XP2RZJJQToGExsw7-2" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-                    <mxGeometry x="270" y="140" width="340" height="340" as="geometry"/>
+                    <mxGeometry x="270" y="120" width="340" height="340" as="geometry"/>
                 </mxCell>
                 <mxCell id="cJSFr9P1ZABAdPwPhEup-2" value="Previous Block Hash" style="rounded=0;whiteSpace=wrap;html=1;fontSize=21;" parent="1" vertex="1">
                     <mxGeometry x="270" y="80" width="340" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="cJSFr9P1ZABAdPwPhEup-4" value="Eligible Block Hash" style="rounded=0;whiteSpace=wrap;html=1;fontSize=21;" parent="1" vertex="1">
-                    <mxGeometry x="270" y="480" width="340" height="60" as="geometry"/>
+                    <mxGeometry x="270" y="460" width="340" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="cJSFr9P1ZABAdPwPhEup-5" value="Transaction 1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" parent="1" vertex="1">
-                    <mxGeometry x="340" y="200" width="200" height="50" as="geometry"/>
+                    <mxGeometry x="340" y="180" width="200" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="cJSFr9P1ZABAdPwPhEup-6" value="Transaction 2" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" parent="1" vertex="1">
-                    <mxGeometry x="340" y="240" width="200" height="50" as="geometry"/>
+                    <mxGeometry x="340" y="220" width="200" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="cJSFr9P1ZABAdPwPhEup-7" value="Transaction n" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" parent="1" vertex="1">
-                    <mxGeometry x="340" y="420" width="200" height="50" as="geometry"/>
+                    <mxGeometry x="340" y="400" width="200" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="cJSFr9P1ZABAdPwPhEup-9" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=5;rounded=0;fontSize=20;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;jumpSize=17;jumpStyle=none;endSize=6;" parent="1" source="cJSFr9P1ZABAdPwPhEup-7" target="cJSFr9P1ZABAdPwPhEup-6" edge="1">
                     <mxGeometry width="50" height="50" relative="1" as="geometry">
-                        <mxPoint x="400" y="440" as="sourcePoint"/>
-                        <mxPoint x="450" y="390" as="targetPoint"/>
+                        <mxPoint x="400" y="420" as="sourcePoint"/>
+                        <mxPoint x="450" y="370" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="JLN3XP2RZJJQToGExsw7-1" value="Nonce" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-                    <mxGeometry x="270" y="140" width="340" height="30" as="geometry"/>
+                <mxCell id="JLN3XP2RZJJQToGExsw7-1" value="Height" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="140" width="110" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="9" value="Miner Tax Transaction" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" parent="1" vertex="1">
-                    <mxGeometry x="317.5" y="171" width="245" height="35" as="geometry"/>
+                <mxCell id="10" value="Miner's Wallet" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="490" y="140" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="Nonce" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="380" y="140" width="110" height="30" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

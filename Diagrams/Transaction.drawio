@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="r8jrAEpcWnGwujQfcr-e" name="Page-1">
-        <mxGraphModel dx="690" dy="245" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="868" dy="272" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -28,7 +28,7 @@
                 <mxCell id="2" value="Type" style="rounded=0;whiteSpace=wrap;html=1;fontSize=18;" parent="1" vertex="1">
                     <mxGeometry x="310" y="270" width="120" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="4" value="Miner Tax (Optional)" style="rounded=0;whiteSpace=wrap;html=1;fontSize=18;" vertex="1" parent="1">
+                <mxCell id="4" value="Miner Fee" style="rounded=0;whiteSpace=wrap;html=1;fontSize=18;" parent="1" vertex="1">
                     <mxGeometry x="550" y="220" width="110" height="50" as="geometry"/>
                 </mxCell>
             </root>
