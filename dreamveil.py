@@ -1,14 +1,15 @@
 from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
 import json
 import hashlib
-import random
+import secrets
 
 import data_structures
 
 class Transaction:
     # Once a transaction object is initiated it is assumed all of its values are valid
     # except the signature, which needs to be manually verified using verify_signature()
-    def __init__(self, sender, receiver, miner_fee, nonce, value, signature):
+    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:str, value, signature:str):
         # TODO Digital Signatures
         self.sender = sender
         self.receiver = receiver
@@ -28,18 +29,28 @@ class Transaction:
 
     # Create a digital signature for the transaction
     # p_key: the private key that is paired with the sender wallet
-    def digital_sign(self, p_key):
+    def sign(self, p_key:RSA.RsaKey):
         # TODO Implement digital signing
         # Temporary non-cryptographic signing (To be replaced)
-        self.signature = str(self.data) + str(self.sender)
+        # CONTINUE
+        self.nonce = secrets.randbits(256)
+        transaction_hash = SHA256.new(self.json_dumps_transaction().encode())
+        #digital_signature = 
 
     def __repr__(self):
         return self.json_dumps_transaction()
 
     def verify_signature(self):
-        # TODO Implement digital signature verifying.
-        # Temporary non-cryptographic method (To be replaced)
-        return self.signature == hashlib.sha256
+        # TODO DEBUG THIS
+        try:
+            rsa_public_key = RSA.import_key(self.sender)
+            transaction_hash = SHA256.new(self.json_dumps_transaction().encode()).hexdigest()
+            if hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[1::] == transaction_hash:
+                return True
+        except:
+            # TODO
+            raise
+        return False
 
     @staticmethod
     def json_loads_transaction(json_str:str):
@@ -57,7 +68,7 @@ class Transaction:
                 raise ValueError("Invalid type prefix in JSON. Possibly corrupt data")
             return transaction_object
         except Exception as err:
-            print("Failed to create Transaction object from JSON. (Invalid data")
+            print("Failed to create Transaction object from JSON. (Invalid data)")
             raise err
 
     def json_dumps_transaction(self):
@@ -65,7 +76,7 @@ class Transaction:
         return json.dumps(information)
 
 class CurrencyTransaction(Transaction):
-    def __init__(self, sender, receiver, value:int, miner_fee:int):
+    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:int, signature:str):
         super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "crt"
 
@@ -81,10 +92,10 @@ class CurrencyTransaction(Transaction):
         return self.value
 
 class NftTransaction(Transaction):
-    def __init__(self, sender, receiver, value:int, miner_fee:int):
+    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:str, signature:str):
         super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "nft"
-
+ 
     def verify_transaction(self):
         if not super().verify_transaction():
             return False
@@ -92,7 +103,7 @@ class NftTransaction(Transaction):
         return self.value
 
 class DataTransaction(Transaction):
-    def __init__(self, sender, receiver, value:str, miner_fee:int):
+    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:str, signature:str):
         super().__init__(sender, receiver, value, miner_fee)
 
         self.type_prefix = "gnd"
@@ -110,13 +121,13 @@ class DataTransaction(Transaction):
 class Block:
     MAX_TRANSACTIONS_LENGTH = 727
 
-    def __init__(self, previous_sign, height):
-        self.signature = None
-        self.previous_sign = previous_sign
+    def __init__(self, previous_block_hash:str, height:int, nonce:int, miner:str, transactions:list, block_hash:str):
+        self.previous_block_hash = previous_block_hash
         self.height = height
-        self.transactions = []
-        self.nonce = 0
-        self.data = bytes()
+        self.nonce = nonce
+        self.miner = miner
+        self.transacions = transactions
+        self.block_hash = block_hash
 
     def add_transaction(self, transaction:Transaction):
         self.nonce = 0
@@ -126,13 +137,36 @@ class Block:
         self.nonce = 0
         self.transactions.remove(transaction)
 
-    def read_block(self):
-        # TODO: Make a better database method
-        return bytes(self.transactions)
+
+    def __repr__(self):
+        return self.dumps_block()
+
+    def dumps_block(self):
+        information = [self.previous_block_hash, self.height, self.nonce, self.miner, self.transacions, self.block_hash]
+        return json.dumps(information)
+
+    @staticmethod
+    def json_loads_block(self, json_str):
+        try:
+            information = json.loads(json_str)
+            assert type(information) == list
+            assert len(information) == 7
+            if information[0] == "crt":
+                transaction_object = CurrencyTransaction(*information)
+            elif information[0] == "nft":
+                transaction_object = NftTransaction(*information)
+            elif information[0] == "gnd":
+                transaction_object = DataTransaction(*information)
+            else:
+                raise ValueError("Invalid type prefix in JSON. Possibly corrupt data")
+            return transaction_object
+        except Exception as err:
+            print("Failed to create Transaction object from JSON. (Invalid data)")
+            raise err
 
     def sign(self):
         # TODO Make a sign function using hashes
-        self.signature = hashlib.sha256(self.read_block())
+        self.signature = SHA256.new(self.read_block()).hexdigest()
         return self.signature
 
     def verify_block(self):
@@ -155,7 +189,7 @@ class Block:
 
     def do_blocks_chain(self, antecedent_block):
         """Checks if antecedent_block << self is a valid chain"""
-        if antecedent_block.signature != self.previous_sign:
+        if antecedent_block.signature != self.previous_block_hash:
             return False
         if antecedent_block.height != self.height+1:
             return False
