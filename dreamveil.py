@@ -73,7 +73,7 @@ class Transaction:
                 raise ValueError("Invalid type prefix in JSON. Possibly corrupt data")
             return transaction_object
         except Exception as err:
-            print("Failed to create Transaction object from JSON. (Invalid data)")
+            print("Failed to create Transaction from JSON. (Invalid data)")
             raise err
 
     def json_dumps_transaction(self):
@@ -142,11 +142,10 @@ class Block:
         self.nonce = 0
         self.transactions.remove(transaction)
 
-
     def __repr__(self):
         return self.dumps_block()
 
-    def dumps_block(self):
+    def json_dumps_block(self):
         information = [self.previous_block_hash, self.height, self.nonce, self.miner, self.transacions, self.block_hash]
         return json.dumps(information)
 
@@ -166,7 +165,7 @@ class Block:
                 raise ValueError("Invalid type prefix in JSON. Possibly corrupt data")
             return transaction_object
         except Exception as err:
-            print("Failed to create Transaction object from JSON. (Invalid data)")
+            print("Failed to create Block from JSON. (Invalid data)")
             raise err
 
     def sign(self):
@@ -280,16 +279,37 @@ class Blockchain:
         raise NotImplementedError()
 
     def calculate_block_reward(self, block):
-        # We divide block reward in two every 52560 blocks (half a year if 5m per block)
-        # a0 = 727 * 52560 = 38211120
-        # sum of geometric series = 2 * a0 = 76422240
-        # Total currency amount 76 422 240
+        """
+        Calculate the reward of the block using a predefined geometric series
+
+        We divide block reward in two every 52560 blocks (half a year if 5m per block)
+        a0 = 727 * 52560 = 38211120
+        sum of geometric series = 2 * a0 = 76422240
+        Total currency amount 76 422 240
+        """
         r = 0.5
         n = block.height // Blockchain.BLOCK_REWARD_SEASON
         block_reward = Blockchain.BLOCK_INITIAL_REWARD * r**n
         for transaction in block_reward.transactions:
             block_reward += transaction.miner_fee
         return block_reward
+
+    def get_next_block_reward(self):
+        """
+        Calculate the reward of the block using a predefined geometric series
+
+        We divide block reward in two every 52560 blocks (half a year if 5m per block)
+        a0 = 727 * 52560 = 38211120
+        sum of geometric series = 2 * a0 = 76422240
+        Total currency amount 76 422 240
+        """
+        r = 0.5
+        n = len(self.blockchain).height // Blockchain.BLOCK_REWARD_SEASON
+        block_reward = Blockchain.BLOCK_INITIAL_REWARD * r**n
+        for transaction in block_reward.transactions:
+            block_reward += transaction.miner_fee
+        return block_reward
+
 
 # debugging
 if __name__ == '__main__':
