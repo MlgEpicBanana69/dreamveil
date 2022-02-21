@@ -30,27 +30,32 @@ class Transaction:
     # Create a digital signature for the transaction
     # p_key: the private key that is paired with the sender wallet
     def sign(self, p_key:RSA.RsaKey):
-        # TODO Implement digital signing
-        # Temporary non-cryptographic signing (To be replaced)
-        # CONTINUE
+        """Signs the transaction object after generating a random Nonce for it using RSA"""
+        # Generate and set a random Nonce
         self.nonce = secrets.randbits(256)
-        transaction_hash = SHA256.new(self.json_dumps_transaction().encode())
-        #digital_signature = 
-
-    def __repr__(self):
-        return self.json_dumps_transaction()
+        # Generate the transaction hash (Including the nonce)
+        transaction_hash = SHA256.new(self.json_dumps_transaction().encode()).hexdigest()
+        # Encrypt the transaction hash using the RSA private key (Digital signature)
+        digital_signature = hex((int(transaction_hash, base=16) ** p_key.e) % p_key.n)[1::]
+        # Set and return the generated digital signature
+        self.signature = digital_signature
+        return digital_signature
 
     def verify_signature(self):
+        """Verifies if the digital signature of the transaction is the same as its true computed digital signature"""
         # TODO DEBUG THIS
         try:
             rsa_public_key = RSA.import_key(self.sender)
-            transaction_hash = SHA256.new(self.json_dumps_transaction().encode()).hexdigest()
-            if hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[1::] == transaction_hash:
+            computed_hash = SHA256.new(self.json_dumps_transaction().encode()).hexdigest()
+            proposed_hash = hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[1::],
+            if secrets.compare_digest(computed_hash, proposed_hash):
                 return True
-        except:
-            # TODO
-            raise
+        except Exception as err:
+            print(f"Verify signature raised exception {err}: {err.args}")
         return False
+
+    def __repr__(self):
+        return self.json_dumps_transaction()
 
     @staticmethod
     def json_loads_transaction(json_str:str):
@@ -95,7 +100,7 @@ class NftTransaction(Transaction):
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:str, signature:str):
         super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "nft"
- 
+
     def verify_transaction(self):
         if not super().verify_transaction():
             return False
