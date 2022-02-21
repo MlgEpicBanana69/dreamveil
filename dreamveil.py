@@ -1,8 +1,12 @@
+from distutils.log import info
+from tkinter import N
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 import json
 import hashlib
 import secrets
+
+from numpy import block
 
 import data_structures
 
@@ -31,7 +35,7 @@ class Transaction:
     def sign(self, p_key:RSA.RsaKey):
         """Signs the transaction object after generating a random Nonce for it using RSA"""
         # Generate and set a random Nonce
-        self.nonce = secrets.randbits(256)
+        self.nonce = hex(secrets.randbits(256))[1::]
         # Generate the transaction hash (Including the nonce)
         transaction_hash = SHA256.new(self.json_dumps_transaction().encode()).hexdigest()
         # Encrypt the transaction hash using the RSA private key (Digital signature)
@@ -58,7 +62,7 @@ class Transaction:
 
     @staticmethod
     def json_loads_transaction(json_str:str):
-        # TODO: Hard code checks for the data coming in
+        # TODO: Hard code information verification for each value
         try:
             information = json.loads(json_str)
             assert type(information) == list
@@ -89,7 +93,7 @@ class CurrencyTransaction(Transaction):
         return self.value
 
 class NftTransaction(Transaction):
-    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:str, signature:str):
+    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:str, value:str, signature:str):
         super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "nft"
 
@@ -118,11 +122,12 @@ class DataTransaction(Transaction):
 
 class Block:
     MAX_TRANSACTIONS_LENGTH = 727
+    MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
-    def __init__(self, previous_block_hash:str, height:int, nonce:int, miner:str, transactions:list, block_hash:str):
+    def __init__(self, previous_block_hash:str, nonce:int, height:int, miner:str, transactions:list, block_hash:str):
         self.previous_block_hash = previous_block_hash
-        self.height = height
         self.nonce = nonce
+        self.height = height
         self.miner = miner
         self.transacions = transactions
         self.block_hash = block_hash
@@ -144,19 +149,38 @@ class Block:
 
     @staticmethod
     def json_loads_block(self, json_str):
+        # TODO: DEBUG THIS
         try:
+            assert len(json_str.encode()) <= Block.MAX_BLOCK_SIZE
             information = json.loads(json_str)
             assert type(information) == list
-            assert len(information) == 7
-            if information[0] == "crt":
-                transaction_object = CurrencyTransaction(*information)
-            elif information[0] == "nft":
-                transaction_object = NftTransaction(*information)
-            elif information[0] == "gnd":
-                transaction_object = DataTransaction(*information)
-            else:
-                raise ValueError("Invalid type prefix in JSON. Possibly corrupt data")
-            return transaction_object
+            assert len(information) == 6
+            assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
+            assert information[1] >= 0
+            assert information[2] >= 0
+            assert information[3]
+            #region verify transactions
+            # Read and interpret each transaction object seperately
+            assert type(information[4]) == list
+            transactions = []
+            for transaction in information[4]:
+                transaction.append(Transaction.json_loads_transaction(repr(transaction)))
+            # Checks that the transaction limit was not reached
+            assert len(transactions) <= Block.MAX_TRANSACTIONS_LENGTH
+
+            #  Checks for the validity of the digital signatures of all of the block's included transactions
+            for transaction in self.transactions:
+                assert transaction.verify_transaction()
+
+            # Verifies that there is one transfer transaction per sender
+            transferative_transactions = [transfer for transfer in self.transacions if type(transaction) != DataTransaction]
+            transferative_transactions_senders = [transfer.sender for transfer in transferative_transactions]
+            for sender in transferative_transactions_senders:
+                assert transferative_transactions_senders.count(sender) == 1
+            #endregion
+            information[4] = transactions
+            assert type(information[5]) == str and len(information[5]) == 64 and int(information[5], base=16)
+            return Block(*information)
         except Exception as err:
             print("Failed to create Block from JSON. (Invalid data)")
             raise err
@@ -165,24 +189,6 @@ class Block:
         # TODO Make a sign function using hashes
         self.signature = SHA256.new(self.json_dumps_block()).hexdigest()
         return self.signature
-
-    def verify_block(self):
-        for transaction in self.transactions:
-            if not transaction.verify_transaction():
-                return False
-
-        currency_transactions = [crt for crt in self.transactions if type(crt) == CurrencyTransaction]
-        if len(currency_transactions) == 0 or len(currency_transactions) > Block.MAX_TRANSACTIONS_LENGTH:
-            return False
-        currency_transactions_senders = [crt.sender for crt in currency_transactions]
-        for sender in currency_transactions_senders:
-            if currency_transactions_senders.count(sender) != 1:
-                return False
-
-        #miner_reward = sum([crt.miner_fee for crt in currency_transactions])
-        # TODO: Add changing difficulty block reward
-        #miner_reward += 50 # Dummy block difficulty reward
-        return True
 
     def do_blocks_chain(self, antecedent_block):
         """Checks if antecedent_block << self is a valid chain"""
@@ -228,33 +234,51 @@ class Blockchain:
             self.untrusted_timeline = newly_trusted_block_node
 
             # Record all of the transactions in the newly added block in the transaction AVL tree
-            # TODO: CONTINUE FROM HERE!!!
             transactions = self.blockchain[-1].transactions
-            # miner fees
-            transactions.insert(0, CurrencyTransaction(None, self.receiver, self.calculate_block_reward(block)))
+            # Add the special miner fees transaction
+            transactions.append(CurrencyTransaction(None, self.miner, None, None, self.calculate_block_reward(block), None))
+            # Go over all of the block's transactions
             for i, transaction in enumerate(transactions):
                 if transaction.sender:
+                    # See if the sender is already recorded in the AVL tree
                     wallet_records = self.transaction_tree.find(transaction.sender)
+                    # Sender is already in the AVL tree
                     if wallet_records is not None:
                         records = wallet_records.value
+                    # Sender is not on the tree
                     else:
+                        # Generate a new AVL tree node
+                        wallet_records = data_structures.binary_tree_node(transaction.sender)
+                        # Set records to the records new template
                         records = Blockchain.WALLET_RECORD_TEMPLATE
                     # New record (|value|, polarity, block index, transaction index)
                     # negativity - if a transaction is negative (1) or positive (0).
+                    # Append new transaction to the sender wallet records
                     records[transaction.type_prefix].append((transaction.value, 1, block.height, i))
+                    # Set tree node value to the updated records
                     wallet_records.value = records
+                    # Insert the updated tree node into the transaction AVL tree
                     self.transaction_tree.insert(self.transaction_tree, wallet_records)
 
                 if transaction.receiver:
+                    # See if the sender is already recorded in the AVL tree
                     wallet_records = self.transaction_tree.find(transaction.receiver)
+                    # Sender is already in the AVL tree
                     if wallet_records is not None:
                         records = wallet_records.value
+                    # Sender is not on the tree
                     else:
+                        # Generate a new AVL tree node
+                        wallet_records = data_structures.binary_tree_node(transaction.sender)
+                        # Set records to the records new template
                         records = Blockchain.WALLET_RECORD_TEMPLATE
                     # New record (|value|, polarity, block index, transaction index)
                     # negativity - if a transaction is negative (1) or positive (0).
+                    # Append new transaction to the sender wallet records
                     records[transaction.type_prefix].append((transaction.value, 0, block.height, i))
+                    # Set tree node value to the updated records
                     wallet_records.value = records
+                    # Insert the updated tree node into the transaction AVL tree
                     self.transaction_tree.insert(self.transaction_tree, wallet_records)
 
     def add_block_to_untrusted_timeline(self, root, block):
@@ -280,29 +304,12 @@ class Blockchain:
         sum of geometric series = 2 * a0 = 76422240
         Total currency amount 76 422 240
         """
-        r = 0.5
+        q = 0.5
         n = block.height // Blockchain.BLOCK_REWARD_SEASON
-        block_reward = Blockchain.BLOCK_INITIAL_REWARD * r**n
+        block_reward = Blockchain.BLOCK_INITIAL_REWARD * q**n
         for transaction in block_reward.transactions:
             block_reward += transaction.miner_fee
         return block_reward
-
-    def get_next_block_reward(self):
-        """
-        Calculate the reward of the block using a predefined geometric series
-
-        We divide block reward in two every 52560 blocks (half a year if 5m per block)
-        a0 = 727 * 52560 = 38211120
-        sum of geometric series = 2 * a0 = 76422240
-        Total currency amount 76 422 240
-        """
-        r = 0.5
-        n = len(self.blockchain).height // Blockchain.BLOCK_REWARD_SEASON
-        block_reward = Blockchain.BLOCK_INITIAL_REWARD * r**n
-        for transaction in block_reward.transactions:
-            block_reward += transaction.miner_fee
-        return block_reward
-
 
 # debugging
 if __name__ == '__main__':
