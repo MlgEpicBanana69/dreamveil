@@ -10,7 +10,6 @@ class Transaction:
     # Once a transaction object is initiated it is assumed all of its values are valid
     # except the signature, which needs to be manually verified using verify_signature()
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:str, value, signature:str):
-        # TODO Digital Signatures
         self.sender = sender
         self.receiver = receiver
         self.nonce = nonce
@@ -59,6 +58,7 @@ class Transaction:
 
     @staticmethod
     def json_loads_transaction(json_str:str):
+        # TODO: Hard code checks for the data coming in
         try:
             information = json.loads(json_str)
             assert type(information) == list
@@ -85,14 +85,6 @@ class CurrencyTransaction(Transaction):
         super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "crt"
 
-    def verify_transaction(self):
-        if not super().verify_transaction():
-            return False
-        try:
-            int(self.value)
-        except ValueError:
-            return False
-
     def get_value(self):
         return self.value
 
@@ -104,6 +96,7 @@ class NftTransaction(Transaction):
     def verify_transaction(self):
         if not super().verify_transaction():
             return False
+
     def get_value(self):
         return self.value
 
@@ -146,7 +139,7 @@ class Block:
     def __repr__(self):
         return self.dumps_block()
 
-    def dumps_block(self):
+    def json_dumps_block(self):
         information = [self.previous_block_hash, self.height, self.nonce, self.miner, self.transacions, self.block_hash]
         return json.dumps(information)
 
@@ -171,7 +164,7 @@ class Block:
 
     def sign(self):
         # TODO Make a sign function using hashes
-        self.signature = SHA256.new(self.read_block()).hexdigest()
+        self.signature = SHA256.new(self.json_dumps_block()).hexdigest()
         return self.signature
 
     def verify_block(self):
