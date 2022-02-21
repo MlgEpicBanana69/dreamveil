@@ -6,9 +6,12 @@ import secrets
 import data_structures
 
 class Transaction:
-    # Once a transaction object is initiated it is assumed all of its values are valid
-    # except the signature, which needs to be manually verified using verify_signature()
+    MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
+
+    # the initializer does not check value validity
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:str, value, signature:str):
+        assert miner_fee >= 0
+
         self.sender = sender
         self.receiver = receiver
         self.nonce = nonce
@@ -19,8 +22,6 @@ class Transaction:
         # type_prefix
         # Transaction type must be a three letter string
         # crt - currency transaction, this type is for transactions of cryptocurrency
-        # fee - initial block transaction, receiver is the miner who mined the block.
-        #       The validity of this transaction is rooted in the validity of its block
         # nft - non-fungible token, this type is for media proof of ownership
         # gnd - generic data, this has no special propeties aside from the fact that it is not filtered
         self.type_prefix = None
@@ -58,11 +59,12 @@ class Transaction:
     @staticmethod
     def json_loads_transaction(json_str:str):
         # TODO: Hard code information verification for each value
-        # CONTINUE FROM HERE
         try:
             information = json.loads(json_str)
+            assert len(information.encode()) <= Transaction.MAX_TRANSACTION_SIZE
             assert type(information) == list
             assert len(information) == 7
+
             if information[0] == "crt":
                 transaction_object = CurrencyTransaction(*information)
             elif information[0] == "nft":
@@ -71,6 +73,11 @@ class Transaction:
                 transaction_object = DataTransaction(*information)
             else:
                 raise ValueError("Invalid type prefix in JSON. Possibly corrupt data")
+            # TODO: Update once wallet format is decided
+            assert transaction_object.sender
+            assert transaction_object.receiver is None or transaction_object.receiver
+            assert transaction_object.verify_signature()
+
             return transaction_object
         except Exception as err:
             print("Failed to create Transaction from JSON. (Invalid data)")
@@ -83,7 +90,7 @@ class Transaction:
 class CurrencyTransaction(Transaction):
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:int, signature:str):
         assert value > 0
-        super().__init__(sender, receiver, value, miner_fee)
+        super().__init__(sender, receiver, miner_fee, nonce, value, signature)
         self.type_prefix = "crt"
 
     def get_value(self):
@@ -91,7 +98,7 @@ class CurrencyTransaction(Transaction):
 
 class NftTransaction(Transaction):
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:str, value:str, signature:str):
-        super().__init__(sender, receiver, value, miner_fee)
+        super().__init__(sender, receiver, miner_fee, nonce, value, signature)
         self.type_prefix = "nft"
 
     #def verify_transaction(self):
@@ -103,7 +110,8 @@ class NftTransaction(Transaction):
 
 class DataTransaction(Transaction):
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:str, signature:str):
-        super().__init__(sender, receiver, value, miner_fee)
+        assert len(value) < 222
+        super().__init__(sender, receiver, miner_fee, nonce, value, signature)
 
         self.type_prefix = "gnd"
 
@@ -155,6 +163,7 @@ class Block:
             assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
             assert information[1] >= 0
             assert information[2] >= 0
+            # TODO: Update once wallet format is defined
             assert information[3]
             #region verify transactions
             # Read and interpret each transaction object seperately
@@ -165,10 +174,10 @@ class Block:
             # Checks that the transaction limit was not reached
             assert len(transactions) <= Block.MAX_TRANSACTIONS_LENGTH
 
-            #  Checks for the validity of the digital signatures of all of the block's included transactions
-            # TODO: Overhaul verify_signature
-            # for transaction in transactions:
-            #    assert transaction.verify_signature()
+            # Verifies that there are no duplicate transactions
+            all_signatures = [t.signature for t in transactions]
+            for signature in all_signatures:
+                assert all_signatures.count(signature) == 1
 
             # Verifies that there is one transfer transaction per sender
             transferative_transactions = [transfer for transfer in transactions if type(transaction) != DataTransaction]
@@ -178,14 +187,13 @@ class Block:
             #endregion
             information[4] = transactions
             assert type(information[5]) == str and len(information[5]) == 64 and int(information[5], base=16)
-            
+
             return Block(*information)
         except Exception as err:
             print("Failed to create Block from JSON. (Invalid data)")
             raise err
 
     def sign(self):
-        # TODO Make a sign function using hashes
         self.signature = SHA256.new(self.json_dumps_block().encode()).hexdigest()
         return self.signature
 
@@ -198,7 +206,6 @@ class Block:
         return True
 
 class Blockchain:
-    GENESIS_BLOCK = Block(None, 0).sign()
     TRUST_HEIGHT = 10
     WALLET_RECORD_TEMPLATE = {"crt": [], "nft": [], "gnd": []}
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
@@ -206,10 +213,10 @@ class Blockchain:
     BLOCK_INITIAL_REWARD = 727
     BLOCK_REWARD_SUM = BLOCK_REWARD_SEASON * BLOCK_INITIAL_REWARD * 2 # 76422240
 
-    def __init__(self):
-        self.chain = [Blockchain.GENESIS_BLOCK]
-        self.transaction_tree = data_structures.AVL()
-        self.untrusted_timeline = data_structures.multifurcasting_node(self.chain[-1])
+    def __init__(self, chain, transaction_tree=None, untrusted_timeline=None):
+        self.chain = chain
+        self.transaction_tree = transaction_tree if transaction_tree is not None else data_structures.AVL()
+        self.untrusted_timeline = untrusted_timeline if untrusted_timeline is not None else data_structures.multifurcasting_node(self.chain[-1])
 
     def chain_block(self, block:Block):
         """Tries to chain a block to the blockchain. This function succeeds only if a block is valid.
@@ -290,10 +297,6 @@ class Blockchain:
                 return True
         return False
 
-    def verify_block(self, block):
-        """Checks if a block is entirely authentic, including its contents (transactions) and their complete validity"""
-        raise NotImplementedError()
-
     def calculate_block_reward(self, block):
         """
         Calculate the reward of the block using a predefined geometric series
@@ -309,6 +312,18 @@ class Blockchain:
         for transaction in block_reward.transactions:
             block_reward += transaction.miner_fee
         return block_reward
+
+    def verify_block(self, block):
+        """Checks if a block is entirely authentic, including its contents (transactions) and their complete validity"""
+        raise NotImplementedError()
+
+    def json_dumps_blockchain(self):
+        # TODO Make blockchain dumps and loads
+        information = [self.chain, self.transaction_tree.to_list(), self.untrusted_timeline.to_list()]
+        return json.dumps(information)
+
+    def json_loads_blockchain(self):
+        raise NotImplementedError()
 
 # debugging
 if __name__ == '__main__':
