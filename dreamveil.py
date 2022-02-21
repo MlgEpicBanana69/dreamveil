@@ -1,12 +1,7 @@
-from distutils.log import info
-from tkinter import N
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 import json
-import hashlib
 import secrets
-
-from numpy import block
 
 import data_structures
 
@@ -63,6 +58,7 @@ class Transaction:
     @staticmethod
     def json_loads_transaction(json_str:str):
         # TODO: Hard code information verification for each value
+        # CONTINUE FROM HERE
         try:
             information = json.loads(json_str)
             assert type(information) == list
@@ -86,6 +82,7 @@ class Transaction:
 
 class CurrencyTransaction(Transaction):
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:int, signature:str):
+        assert value > 0
         super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "crt"
 
@@ -97,9 +94,9 @@ class NftTransaction(Transaction):
         super().__init__(sender, receiver, value, miner_fee)
         self.type_prefix = "nft"
 
-    def verify_transaction(self):
-        if not super().verify_transaction():
-            return False
+    #def verify_transaction(self):
+    #    if not super().verify_transaction():
+    #        return False
 
     def get_value(self):
         return self.value
@@ -110,12 +107,12 @@ class DataTransaction(Transaction):
 
         self.type_prefix = "gnd"
 
-    def verify_transaction(self):
-        if not super().verify_transaction():
-            return False
-        if len(self.data) == 0 or len(self.data) > 140:
-            return False
-        return True
+    #def verify_transaction(self):
+    #    if not super().verify_transaction():
+    #        return False
+    #    if len(self.data) == 0 or len(self.data) > 140:
+    #        return False
+    #    return True
 
     def get_value(self):
         return self.value
@@ -141,14 +138,14 @@ class Block:
         self.transactions.remove(transaction)
 
     def __repr__(self):
-        return self.dumps_block()
+        return self.json_dumps_block()
 
     def json_dumps_block(self):
         information = [self.previous_block_hash, self.height, self.nonce, self.miner, self.transacions, self.block_hash]
         return json.dumps(information)
 
     @staticmethod
-    def json_loads_block(self, json_str):
+    def json_loads_block(json_str):
         # TODO: DEBUG THIS
         try:
             assert len(json_str.encode()) <= Block.MAX_BLOCK_SIZE
@@ -169,17 +166,19 @@ class Block:
             assert len(transactions) <= Block.MAX_TRANSACTIONS_LENGTH
 
             #  Checks for the validity of the digital signatures of all of the block's included transactions
-            for transaction in self.transactions:
-                assert transaction.verify_transaction()
+            # TODO: Overhaul verify_signature
+            # for transaction in transactions:
+            #    assert transaction.verify_signature()
 
             # Verifies that there is one transfer transaction per sender
-            transferative_transactions = [transfer for transfer in self.transacions if type(transaction) != DataTransaction]
+            transferative_transactions = [transfer for transfer in transactions if type(transaction) != DataTransaction]
             transferative_transactions_senders = [transfer.sender for transfer in transferative_transactions]
             for sender in transferative_transactions_senders:
                 assert transferative_transactions_senders.count(sender) == 1
             #endregion
             information[4] = transactions
             assert type(information[5]) == str and len(information[5]) == 64 and int(information[5], base=16)
+            
             return Block(*information)
         except Exception as err:
             print("Failed to create Block from JSON. (Invalid data)")
@@ -187,7 +186,7 @@ class Block:
 
     def sign(self):
         # TODO Make a sign function using hashes
-        self.signature = SHA256.new(self.json_dumps_block()).hexdigest()
+        self.signature = SHA256.new(self.json_dumps_block().encode()).hexdigest()
         return self.signature
 
     def do_blocks_chain(self, antecedent_block):
