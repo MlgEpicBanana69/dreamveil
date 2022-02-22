@@ -23,6 +23,17 @@ class AVL:
             # Could not find key in tree
             return None
 
+    def trace(self, root, key, trace=""):
+        if root is not None:
+            if key > trace.key:
+                trace += "R"
+                return self.find(root.right, key, root, trace)
+            elif key < root.key:
+                trace += "L"
+                return self.find(root.left, key, root, trace)
+            else:
+                return root, trace
+
     def insert(self, root, node:binary_tree_node):
         if self.tree is None:
             self.tree = node
@@ -92,6 +103,12 @@ class multifurcasting_node:
         self.key = key
         self.children = []
         self.height = 1
+
+    def trace(self, root, key, trace=[]):
+        # CONTINUE FROM HERE
+        # TODO: ADD A TRACE/SEARCH FUNCTION
+        raise NotImplementedError()
+
 
     def calculate_height(self):
         height_sum = 0

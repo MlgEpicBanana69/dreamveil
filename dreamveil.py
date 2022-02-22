@@ -46,7 +46,7 @@ class Transaction:
         try:
             rsa_public_key = RSA.import_key(self.sender)
             computed_hash = SHA256.new(self.json_dumps_transaction().encode()).hexdigest()
-            proposed_hash = hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[1::],
+            proposed_hash = hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[1::]
             if secrets.compare_digest(computed_hash, proposed_hash):
                 return True
         except Exception as err:
@@ -161,10 +161,12 @@ class Block:
             assert type(information) == list
             assert len(information) == 6
             assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
+            # Nonce
             assert information[1] >= 0
+            # Block height
             assert information[2] >= 0
             # TODO: Update once wallet format is defined
-            assert information[3]
+            assert information[3] # Miner wallet
             #region verify transactions
             # Read and interpret each transaction object seperately
             assert type(information[4]) == list
@@ -314,8 +316,16 @@ class Blockchain:
         return block_reward
 
     def verify_block(self, block):
-        """Checks if a block is entirely authentic, including its contents (transactions) and their complete validity"""
-        raise NotImplementedError()
+        """
+        Checks if a block is entirely authentic, including its contents (transactions) and their complete validity.
+        This verifies that the sender of each transaction in the block has enough balance to carry it out.
+        Transactions do not recognize other transactions in the same block to prevent order frauding
+        """
+        # CONTINUE FROM HERE
+        # TODO: verify_block()
+        for transaction in block.transactions:
+            pass
+            
 
     def json_dumps_blockchain(self):
         # TODO Make blockchain dumps and loads
