@@ -98,17 +98,37 @@ class AVL:
     def get_balance(self, root):
         return self.get_height(root.right) - self.get_height(root.left)
 
+
 class multifurcasting_node:
-    def __init__(self, key):
+    def __init__(self, key, value):
         self.key = key
+        self.value = value
         self.children = []
         self.height = 1
 
-    def trace(self, root, key, trace=[]):
+class multifurcasting_tree:
+    def __init__(self):
+        self.tree = None
+
+    def insert(self, root, dst_key, node:multifurcasting_node):
         # CONTINUE FROM HERE
         # TODO: ADD A TRACE/SEARCH FUNCTION
-        raise NotImplementedError()
+        if self.tree is None:
+            self.tree = node
+            return
 
+        if dst_key == root.key:
+            root.children.append(node)
+            return root
+
+        if len(root.children) == 0:
+            return
+
+        for child in root.children:
+            result = self.insert(self, child, dst_key, node)
+            if result is not None:
+                break
+        return result
 
     def calculate_height(self):
         height_sum = 0
