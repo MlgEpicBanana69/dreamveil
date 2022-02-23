@@ -299,6 +299,10 @@ class Blockchain:
         if root is None:
             root = self.untrusted_timeline.tree
 
+        # The block was already inserted into the timeline
+        if root.value.block_hash == block.block_hash:
+            return None
+
         if root.value.block_hash == block.previous_block_hash:
             root.children.append(block)
             return root
