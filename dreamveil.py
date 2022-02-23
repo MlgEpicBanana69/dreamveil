@@ -216,9 +216,14 @@ class Blockchain:
     BLOCK_REWARD_SUM = BLOCK_REWARD_SEASON * BLOCK_INITIAL_REWARD * 2 # 76422240
 
     def __init__(self, chain, transaction_tree=None, untrusted_timeline=None):
+        assert len(chain) > 0
         self.chain = chain
         self.transaction_tree = transaction_tree if transaction_tree is not None else data_structures.AVL()
-        self.untrusted_timeline = untrusted_timeline if untrusted_timeline is not None else data_structures.multifurcasting_node(self.chain[-1])
+        if untrusted_timeline is not None:
+            self.untrusted_timeline = untrusted_timeline
+        else:
+            self.untrusted_timeline = data_structures.multifurcasting_tree()
+            self.untrusted_timeline.insert(chain[-1], None)
 
     def chain_block(self, block:Block):
         """Tries to chain a block to the blockchain. This function succeeds only if a block is valid.
@@ -237,7 +242,7 @@ class Blockchain:
             # Untrusted block has a TRUST_HEIGHT timeline
             # Block is chained into the blockchain since it can now be trusted
             newly_trusted_block_node = self.untrusted_timeline.get_highest_child()
-            self.blockchain.append(newly_trusted_block_node.key)
+            self.blockchain.append(newly_trusted_block_node.value)
             # Remove the now trusted block from the timeline and advance on its timeline
             self.untrusted_timeline = newly_trusted_block_node
 
@@ -289,15 +294,22 @@ class Blockchain:
                     # Insert the updated tree node into the transaction AVL tree
                     self.transaction_tree.insert(self.transaction_tree, wallet_records)
 
-    def add_block_to_untrusted_timeline(self, root, block):
-        if block.do_blocks_chain(root.key):
-            next_node = data_structures.multifurcasting_node(block)
-            root.children.append(next_node)
-            return True
+    def _insert_block_to_multifurcasting_tree(self, block, root):
+        if root is None:
+            root = self.untrusted_timeline.tree
+
+        if root.value.block_hash == block.previous_block_hash:
+            root.children.append(block)
+            return root
+
         for child in root.children:
-            if self.add_block_to_untrusted_timeline(child, block):
-                return True
-        return False
+            result = self._insert_block_to_multifurcasting_tree(block, child)
+            if result is not None:
+                break
+        return result
+
+    def add_block_to_untrusted_timeline(self, block):
+        return self._insert_block_to_multifurcasting_tree(self, block, self.untrusted_timeline)
 
     def calculate_block_reward(self, block):
         """
@@ -321,17 +333,29 @@ class Blockchain:
         This verifies that the sender of each transaction in the block has enough balance to carry it out.
         Transactions do not recognize other transactions in the same block to prevent order frauding
         """
-        # CONTINUE FROM HERE
-        # TODO: verify_block()
+        untrusted_timeline_block_trace = self.untrusted_timeline.trace(block)
+        if untrusted_timeline_block_trace is None:
+            return False
+        # TODO: DEBUG
+
+        assert len(untrusted_timeline_block_trace) > 0
+
         for transaction in block.transactions:
-            pass
-            
+            if type(transaction) == CurrencyTransaction:
+                wallet_records = self.transaction_tree.find(transaction)
+                if wallet_records is None:
+                    return False
+                wallet_balance = sum(wallet_records["crt"])
+                if wallet_balance < transaction.value:
+                    return False
+        return True
 
     def json_dumps_blockchain(self):
         # TODO Make blockchain dumps and loads
         information = [self.chain, self.transaction_tree.to_list(), self.untrusted_timeline.to_list()]
         return json.dumps(information)
 
+    @staticmethod
     def json_loads_blockchain(self):
         raise NotImplementedError()
 

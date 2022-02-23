@@ -12,6 +12,7 @@ class AVL:
         self.tree = None
 
     def find(self, root, key):
+        """Finds and returns the node of a given key in the tree. Returns None if does not exist"""
         if root is not None:
             if key > root.key:
                 return self.find(root.right, key)
@@ -22,17 +23,6 @@ class AVL:
         else:
             # Could not find key in tree
             return None
-
-    def trace(self, root, key, trace=""):
-        if root is not None:
-            if key > trace.key:
-                trace += "R"
-                return self.find(root.right, key, root, trace)
-            elif key < root.key:
-                trace += "L"
-                return self.find(root.left, key, root, trace)
-            else:
-                return root, trace
 
     def insert(self, root, node:binary_tree_node):
         if self.tree is None:
@@ -98,10 +88,8 @@ class AVL:
     def get_balance(self, root):
         return self.get_height(root.right) - self.get_height(root.left)
 
-
 class multifurcasting_node:
-    def __init__(self, key, value):
-        self.key = key
+    def __init__(self, value, parent=None):
         self.value = value
         self.children = []
         self.height = 1
@@ -110,25 +98,44 @@ class multifurcasting_tree:
     def __init__(self):
         self.tree = None
 
-    def insert(self, root, dst_key, node:multifurcasting_node):
+    def insert(self, val, prev_val, root=None):
         # CONTINUE FROM HERE
         # TODO: ADD A TRACE/SEARCH FUNCTION
         if self.tree is None:
-            self.tree = node
+            self.tree = multifurcasting_node(val)
             return
 
-        if dst_key == root.key:
-            root.children.append(node)
+        if root is None:
+            root = self.tree
+
+        if root.value == prev_val:
+            root.children.append(multifurcasting_node(val))
             return root
 
         if len(root.children) == 0:
             return
 
         for child in root.children:
-            result = self.insert(self, child, dst_key, node)
+            result = self.insert(val, prev_val, child)
             if result is not None:
                 break
         return result
+
+    def trace(self, val, root=None, result=[]):
+        if root is None:
+            root = self.tree
+        
+        if self.tree is None:
+            return
+
+        if root.value == val:
+            return root
+
+        for child in root.children:
+            output = self.trace(val, child, result + [child])
+            if output is not None:
+                return result + [child]
+        return None
 
     def calculate_height(self):
         height_sum = 0
