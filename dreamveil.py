@@ -130,6 +130,7 @@ class Block:
     MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
     def __init__(self, previous_block_hash:str, nonce:int, height:int, miner:str, transactions:list, block_hash:str):
+        assert len(transactions) > 0
         self.previous_block_hash = previous_block_hash
         self.nonce = nonce
         self.height = height
@@ -329,8 +330,7 @@ class Blockchain:
 
     def verify_block(self, block):
         """
-        Checks if a block is entirely authentic, including its contents (transactions) and their complete validity.
-        This verifies that the sender of each transaction in the block has enough balance to carry it out.
+        This function verifies that the sender of each transaction in the block has the resources to carry it out.
         Transactions do not recognize other transactions in the same block to prevent order frauding
         """
         untrusted_timeline_block_trace = self.untrusted_timeline.trace(block)
@@ -339,7 +339,6 @@ class Blockchain:
         # TODO: DEBUG
 
         assert len(untrusted_timeline_block_trace) > 0
-
         for transaction in block.transactions:
             if type(transaction) == CurrencyTransaction:
                 wallet_records = self.transaction_tree.find(transaction)
