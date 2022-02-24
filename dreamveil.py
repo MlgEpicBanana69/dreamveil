@@ -349,6 +349,16 @@ class Blockchain:
                 if wallet_records is None:
                     return False
                 wallet_balance = sum(wallet_records["crt"])
+                # Add to trusted wallet_balance the untrusted timeline transaction changes
+                # this is ment to guarantee timeline transaction consistency used for the verification off the block
+                for traced_block in untrusted_timeline_block_trace[0:-1:]:
+                    for traced_transaction in traced_block:
+                        if type(traced_transaction) == CurrencyTransaction:
+                            if traced_transaction.sender == transaction.sender:
+                                wallet_balance -= traced_transaction.value
+                            elif traced_transaction.reciever == transaction.sender:
+                                wallet_balance += traced_transaction.value
+
                 if wallet_balance < transaction.value:
                     return False
         return True
@@ -365,6 +375,11 @@ class Blockchain:
 # debugging
 if __name__ == '__main__':
     # t = CurrencyTransaction("a", "b", 1, 0)
-    with open("transaction_dumps_example.json", "r") as amogus:
-       t = Transaction.json_loads_transaction(amogus.read())
-    print(t)
+    cringe = data_structures.multifurcasting_tree()
+    cringe.insert(10, None)
+    cringe.insert(15, 10)
+    cringe.insert(7, 10)
+    cringe.insert(8, 15)
+    print(cringe)
+    gay = data_structures.multifurcasting_tree.json_loads_tree(cringe.json_dumps_tree())
+    print(gay)

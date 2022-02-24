@@ -1,4 +1,6 @@
 # A binary node that can store a value seperate from its key
+import json
+
 class binary_tree_node:
     def __init__(self, key, value=None):
         self.key = key
@@ -89,14 +91,17 @@ class AVL:
         return self.get_height(root.right) - self.get_height(root.left)
 
 class multifurcasting_node:
-    def __init__(self, value, parent=None):
+    def __init__(self, value):
         self.value = value
         self.children = []
         self.height = 1
 
+    def to_list(self):
+        return [self.value, [child.to_list() for child in self.children]]
+
 class multifurcasting_tree:
-    def __init__(self):
-        self.tree = None
+    def __init__(self, root=None):
+        self.tree = root
 
     def insert(self, val, prev_val, root=None):
         # CONTINUE FROM HERE
@@ -127,7 +132,6 @@ class multifurcasting_tree:
         
         if self.tree is None:
             return
-
         if root.value == val:
             return root
 
@@ -152,3 +156,24 @@ class multifurcasting_tree:
             if child.height > highest_child.height:
                 highest_child = child
         return highest_child
+
+    def json_dumps_tree(self):
+        return str(self.tree.to_list())
+
+    def __repr__(self):
+        return self.json_dumps_tree()
+
+    @staticmethod
+    def json_loads_tree(json_str):
+        obj = json.loads(json_str)
+        return multifurcasting_tree(multifurcasting_tree.peel_json_object(obj))
+    @staticmethod
+    def peel_json_object(json_obj):
+        #[ 7, [ [15, []], [14, []] ] ]
+        if len(json_obj[1]) == 0:
+            return multifurcasting_node(json_obj[0])
+
+        root = multifurcasting_node(json_obj[0])
+        for peel in json_obj[1]:
+            root.children.append(multifurcasting_tree.peel_json_object(peel))
+        return root
