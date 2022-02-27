@@ -381,21 +381,4 @@ class Blockchain:
 
 # debugging
 if __name__ == '__main__':
-    # t = CurrencyTransaction("a", "b", 1, 0)
-    cringe = data_structures.AVL()
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(10, "sus"))
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(15, "imposter"))
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(7, "among us"))
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(8, "trollface"))
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(69, "amazing"))
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(14, "gaming"))
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(6, "L"))
-    cringe.insert(cringe.tree, data_structures.binary_tree_node(5, "kek"))
-
-    #L = data_structures.binary_tree_node(20, "L")
-    #print(L.json_dumps_node())
-    print(cringe.dumps_avl())
-    tree = (data_structures.AVL.loads_avl(cringe.dumps_avl()))
-    print(tree.dumps_avl())
- #   gay = data_structures..json_loads_tree(cringe.json_dumps_tree())
- #   print(gay)
+    pass
