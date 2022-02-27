@@ -148,6 +148,12 @@ class AVL:
         for i in range(int(math.log(len(all_nodes), 2))):
             curr_parents = all_nodes[2**i - 1: 2**(i+1) - 1]
             curr_children = all_nodes[2**(i+1) - 1:2**(i+2)-1]
+            for parent in curr_parents:
+                if parent is not None:
+                    parent.height = 1 + int(math.log(len(all_nodes), 2)) - i
+            for child in curr_children:
+                if child is not None:
+                    child.height = 1 + int(math.log(len(all_nodes), 2)) - (i + 1)
 
             for c, child in enumerate(curr_children):
                 parent = curr_parents[c//2]
