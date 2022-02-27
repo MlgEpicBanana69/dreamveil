@@ -33,7 +33,8 @@ class Transaction:
         # Generate and set a random Nonce
         self.nonce = hex(secrets.randbits(256))[1::]
         # Generate the transaction hash (Including the nonce)
-        transaction_hash = SHA256.new(self.json_dumps_transaction().encode()).hexdigest()
+        # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
+        transaction_hash = SHA256.new(self.get_contents().encode()).hexdigest()
         # Encrypt the transaction hash using the RSA private key (Digital signature)
         digital_signature = hex((int(transaction_hash, base=16) ** p_key.e) % p_key.n)[1::]
         # Set and return the generated digital signature
@@ -85,6 +86,10 @@ class Transaction:
 
     def json_dumps_transaction(self):
         information = [self.type_prefix, self.sender, self.receiver, self.miner_fee, self.nonce, self.value, self.signature]
+        return json.dumps(information)
+
+    def get_contents(self):
+        information = [self.type_prefix, self.sender, self.receiver, self.miner_fee, self.nonce, self.value]
         return json.dumps(information)
 
 class CurrencyTransaction(Transaction):
@@ -365,7 +370,7 @@ class Blockchain:
 
     def json_dumps_blockchain(self):
         # TODO Make blockchain dumps and loads
-        information = [self.chain, self.transaction_tree.to_list(), self.untrusted_timeline.to_list()]
+        information = [self.chain, self.transaction_tree.dumps_avl(), self.untrusted_timeline.to_list()]
         return json.dumps(information)
 
     @staticmethod
@@ -375,11 +380,11 @@ class Blockchain:
 # debugging
 if __name__ == '__main__':
     # t = CurrencyTransaction("a", "b", 1, 0)
-    cringe = data_structures.multifurcasting_tree()
-    cringe.insert(10, None)
-    cringe.insert(15, 10)
-    cringe.insert(7, 10)
-    cringe.insert(8, 15)
-    print(cringe)
-    gay = data_structures.multifurcasting_tree.json_loads_tree(cringe.json_dumps_tree())
-    print(gay)
+    cringe = data_structures.AVL()
+    cringe.insert(cringe.tree, data_structures.binary_tree_node(10, "sus"))
+    cringe.insert(cringe.tree, data_structures.binary_tree_node(15, "imposter"))
+    cringe.insert(cringe.tree, data_structures.binary_tree_node(7, "among us"))
+    cringe.insert(cringe.tree, data_structures.binary_tree_node(8, "trollface"))
+    print(cringe.dumps_avl())
+ #   gay = data_structures..json_loads_tree(cringe.json_dumps_tree())
+ #   print(gay)

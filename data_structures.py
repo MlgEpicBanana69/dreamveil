@@ -1,5 +1,6 @@
 # A binary node that can store a value seperate from its key
 import json
+import math
 
 class binary_tree_node:
     def __init__(self, key, value=None):
@@ -8,6 +9,9 @@ class binary_tree_node:
         self.left = None
         self.right = None
         self.height = 1
+
+    def __repr__(self):
+        return str(self.value)
 
 class AVL:
     def __init__(self):
@@ -26,7 +30,7 @@ class AVL:
             # Could not find key in tree
             return None
 
-    def insert(self, root, node:binary_tree_node):
+    def insert(self, root, node):
         if self.tree is None:
             self.tree = node
             return
@@ -35,9 +39,9 @@ class AVL:
             return node
 
         if node.key > root.key:
-            root.right = self.insert(root.right, node.key)
+            root.right = self.insert(root.right, node)
         elif node.key < root.key:
-            root.left = self.insert(root.left, node.key)
+            root.left = self.insert(root.left, node)
         else:
             root.value = node.value
 
@@ -90,6 +94,41 @@ class AVL:
     def get_balance(self, root):
         return self.get_height(root.right) - self.get_height(root.left)
 
+    def dumps_avl(self, curr_parents=None):
+        output = ""
+        if self.tree is None:
+                return ""
+        if curr_parents is None:
+            output = f"{self.tree.height ** 2 - 1}\x00{str(self.tree.value)}"
+            curr_parents = [self.tree]
+        if curr_parents == len(curr_parents) * [None]:
+            return output
+
+        children = []
+        for parent in curr_parents:
+            if parent is not None:
+                output += "\x00" + (parent.left.value if parent.left is not None else "None")
+                output += "\x00" + (parent.right.value if parent.right is not None else "None")
+
+                children.append(parent.left)
+                children.append(parent.right)
+            else:
+                output += "\x00None\x00None"
+                children.append(None)
+                children.append(None)
+        next_rec = self.dumps_avl(children)
+        if next_rec == "":
+            return "\x00"
+        elif next_rec == "\x00":
+            return output
+        else:
+            output += next_rec
+            return output
+
+    @staticmethod
+    def loads_avl(self):
+        raise NotImplementedError()
+
 class multifurcasting_node:
     def __init__(self, value):
         self.value = value
@@ -129,7 +168,7 @@ class multifurcasting_tree:
     def trace(self, val, root=None, result=[]):
         if root is None:
             root = self.tree
-        
+
         if self.tree is None:
             return
         if root.value == val:
@@ -167,9 +206,9 @@ class multifurcasting_tree:
     def json_loads_tree(json_str):
         obj = json.loads(json_str)
         return multifurcasting_tree(multifurcasting_tree.peel_json_object(obj))
+
     @staticmethod
     def peel_json_object(json_obj):
-        #[ 7, [ [15, []], [14, []] ] ]
         if len(json_obj[1]) == 0:
             return multifurcasting_node(json_obj[0])
 
