@@ -370,12 +370,14 @@ class Blockchain:
 
     def json_dumps_blockchain(self):
         # TODO Make blockchain dumps and loads
-        information = [self.chain, self.transaction_tree.dumps_avl(), self.untrusted_timeline.to_list()]
+        information = [self.chain, self.transaction_tree.dumps_avl(), self.untrusted_timeline.json_dumps_tree()]
         return json.dumps(information)
 
     @staticmethod
-    def json_loads_blockchain(self):
-        raise NotImplementedError()
+    def json_loads_blockchain(json_str):
+        json_obj = json.loads(json_str)
+        assert type(json_obj) == list
+        return Blockchain(*json_obj)
 
 # debugging
 if __name__ == '__main__':
