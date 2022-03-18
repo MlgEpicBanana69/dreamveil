@@ -16,12 +16,10 @@ class Server:
         self.socket = None
         self.peers = []
         self.closed = False
-        self.thread = threading.Thread(target=self._server_run)
-
-    def run(self):
+        self.thread = threading.Thread(target=self.run)
         self.thread.start()
 
-    def _server_run(self):
+    def run(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.address, self.port))
         self.socket.listen(self.max_peer_amount)
