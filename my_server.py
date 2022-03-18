@@ -1,4 +1,5 @@
-from ctypes import addressof
+import dreamveil
+
 import socket
 import threading
 
@@ -63,5 +64,5 @@ class Connection:
 
     def run(self):
         while not self.closed:
-            message = self.socket.recv()
+            message = self.socket.recv(dreamveil.Block.MAX_BLOCK_SIZE)
             print(message)
