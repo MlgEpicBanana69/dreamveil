@@ -15,19 +15,47 @@ class Server:
         self.max_peer_amount = max_peer_amount
         self.socket = None
         self.peers = []
-        self.terminated = False
+        self.closed = False
 
-    async def run(self):
+    def run(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.address, self.port))
         self.socket.listen(self.max_peer_amount)
 
-        while not self.terminated:
+        print(f"Server is now running and binded to {(self.address, self.port)}")
+        print("============================================")
+
+        while not self.closed:
             peer_socket, peer_address = self.socket.accept()
-            self.peers.append(Connection())
+            self.peers.append(Connection(peer_socket, peer_address))
             print(f"### {peer_socket, peer_address} connected to node")
 
+    def connect(self, address):
+        peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        peer_socket.connect(address, self.port)
+        self.peers.append(Connection(peer_socket, address))
+
+    def close(self):
+        for peer in self.peers:
+            peer.close()
+
+        self.closed = True
+
 class Connection:
-    def __init__(self, peer_socket, peer_address):
+    def __init__(self, socket, address):
         self.socket = socket
-        self.address = addressof
+        self.address = address
+        self.closed = False
+
+    def close(self):
+        self.socket.shutdown()
+        self.socket.close()
+        self.closed = True
+
+    async def send(self, message):
+        self.socket.send(message)
+
+    async def run(self):
+        while not self.closed:
+            message = self.socket.receive()
+            print(message)
