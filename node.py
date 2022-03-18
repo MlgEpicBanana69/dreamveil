@@ -15,8 +15,12 @@ tracemalloc.start()
 
 VERSION = "1.0"
 
-server = Server("127.0.0.1")
+# 192.168.1.19
+server = Server("192.168.1.19")
 server.run()
+
+p = server.connect("192.168.1.36")
+p.send("hello")
 
 print("?")
 
