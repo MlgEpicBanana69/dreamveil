@@ -58,7 +58,7 @@ class Connection:
         self.socket.close()
         self.closed = True
 
-        del Server.singleton.peersp[self.address]
+        del Server.singleton.peers[self.address]
 
     def send(self, message:str):
         self.socket.send(message.encode())
