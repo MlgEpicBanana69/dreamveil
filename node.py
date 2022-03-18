@@ -13,7 +13,6 @@ VERSION = "1.0"
 
 # 192.168.1.19
 server = Server("192.168.1.19")
-server.run()
 
 p = server.connect("192.168.1.36")
 p.send("hello")

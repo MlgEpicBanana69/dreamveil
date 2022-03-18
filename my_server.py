@@ -52,6 +52,8 @@ class Connection:
         self.socket = socket
         self.address = address
         self.closed = False
+        self.thread = threading.Thread(target=self.run)
+        self.thread.start()
 
     def close(self):
         self.socket.shutdown()
@@ -63,5 +65,5 @@ class Connection:
 
     def run(self):
         while not self.closed:
-            message = self.socket.receive()
+            message = self.socket.recv()
             print(message)
