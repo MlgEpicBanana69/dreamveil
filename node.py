@@ -29,6 +29,6 @@ def window():
     node_window.setWindowTitle("Dreamveil")
 
     node_window.show()
-    sys.exit(QApplication.exec_())
+    sys.exit(node_app.exec_())
 
 window()
