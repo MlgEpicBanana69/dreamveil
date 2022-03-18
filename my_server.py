@@ -6,7 +6,7 @@ import threading
 class Server:
     singleton = None
 
-    def __init__(self, address, port=22727, max_peer_amount=150):
+    def __init__(self, version, address, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -34,11 +34,15 @@ class Server:
             print(f"### {peer_address} connected to node")
 
     def connect(self, address):
-        peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        peer_socket.connect((address, self.port))
-        new_peer = Connection(peer_socket, address)
-        self.peers[address] = new_peer
-        return new_peer
+        try:
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            peer_socket.connect((address, self.port))
+            new_peer = Connection(peer_socket, address)
+            self.peers[address] = new_peer
+            return new_peer
+        except TimeoutError:
+            print(f"!!! Failed to connect to {address}")
+            return None
 
     def close(self):
         """Terminated the server and all of its ongoing connections"""
