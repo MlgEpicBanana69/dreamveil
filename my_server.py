@@ -33,7 +33,9 @@ class Server:
     def connect(self, address):
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         peer_socket.connect(address, self.port)
-        self.peers.append(Connection(peer_socket, address))
+        new_peer = Connection(peer_socket, address)
+        self.peers.append(new_peer)
+        return new_peer
 
     def close(self):
         for peer in self.peers:
