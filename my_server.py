@@ -41,6 +41,9 @@ class Server:
         return new_peer
 
     def close(self):
+        """Terminated the server and all of its ongoing connections"""
+        print("### SHUTTING DOWN SERVER")
+
         for peer in self.peers:
             peer.close()
 
@@ -57,6 +60,8 @@ class Connection:
     def close(self):
         self.socket.close()
         self.closed = True
+
+        print(f"### Closed connection with {self.address}")
 
         del Server.singleton.peers[self.address]
 
