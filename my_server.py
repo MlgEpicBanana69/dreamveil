@@ -1,6 +1,6 @@
 from ctypes import addressof
 import socket
-import asyncio
+import threading
 
 class Server:
     singleton = None
@@ -16,8 +16,12 @@ class Server:
         self.socket = None
         self.peers = []
         self.closed = False
+        self.thread = threading.Thread(target=self._server_run)
 
     def run(self):
+        self.thread.start()
+
+    def _server_run(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.address, self.port))
         self.socket.listen(self.max_peer_amount)
@@ -28,11 +32,11 @@ class Server:
         while not self.closed:
             peer_socket, peer_address = self.socket.accept()
             self.peers.append(Connection(peer_socket, peer_address))
-            print(f"### {peer_socket, peer_address} connected to node")
+            print(f"### {peer_address} connected to node")
 
     def connect(self, address):
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        peer_socket.connect(address, self.port)
+        peer_socket.connect((address, self.port))
         new_peer = Connection(peer_socket, address)
         self.peers.append(new_peer)
         return new_peer
@@ -54,10 +58,10 @@ class Connection:
         self.socket.close()
         self.closed = True
 
-    async def send(self, message):
+    def send(self, message):
         self.socket.send(message)
 
-    async def run(self):
+    def run(self):
         while not self.closed:
             message = self.socket.receive()
             print(message)
