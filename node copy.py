@@ -15,7 +15,7 @@ tracemalloc.start()
 
 VERSION = "1.0"
 
-server = Server("127.0.0.1")
+server = Server("127.0.0.1", 22726)
 server.run()
 
 print("?")
