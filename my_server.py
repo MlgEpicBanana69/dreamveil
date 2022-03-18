@@ -15,7 +15,7 @@ class Server:
         self.port = port
         self.max_peer_amount = max_peer_amount
         self.socket = None
-        self.peers = []
+        self.peers = {}
         self.closed = False
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
@@ -30,14 +30,14 @@ class Server:
 
         while not self.closed:
             peer_socket, peer_address = self.socket.accept()
-            self.peers.append(Connection(peer_socket, peer_address))
+            self.peers[peer_address] = Connection(peer_socket, peer_address)
             print(f"### {peer_address} connected to node")
 
     def connect(self, address):
         peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         peer_socket.connect((address, self.port))
         new_peer = Connection(peer_socket, address)
-        self.peers.append(new_peer)
+        self.peers[address] = new_peer
         return new_peer
 
     def close(self):
@@ -59,10 +59,15 @@ class Connection:
         self.socket.close()
         self.closed = True
 
+        del Server.singleton.peersp[self.address]
+
     def send(self, message:str):
         self.socket.send(message.encode())
 
     def run(self):
-        while not self.closed:
-            message = self.socket.recv(dreamveil.Block.MAX_BLOCK_SIZE)
-            print(message)
+        try:
+            while not self.closed:
+                message = self.socket.recv(dreamveil.Block.MAX_BLOCK_SIZE)
+                print(message)
+        except (ConnectionResetError):
+            self.close()
