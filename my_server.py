@@ -58,8 +58,8 @@ class Connection:
         self.socket.close()
         self.closed = True
 
-    def send(self, message):
-        self.socket.send(message)
+    def send(self, message:str):
+        self.socket.send(message.encode())
 
     def run(self):
         while not self.closed:
