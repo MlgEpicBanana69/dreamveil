@@ -55,7 +55,6 @@ class Connection:
         self.thread.start()
 
     def close(self):
-        self.socket.shutdown()
         self.socket.close()
         self.closed = True
 
