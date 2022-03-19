@@ -11,6 +11,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
+        self.version = version
         self.address = address
         self.port = port
         self.max_peer_amount = max_peer_amount
