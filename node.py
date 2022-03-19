@@ -19,7 +19,7 @@ p.send("hello")
 def window():
     node_app = QApplication(sys.argv)
     node_window = QMainWindow()
-    node_window.setGeometry(1920, 1080, 100, 100)
+    node_window.setGeometry(650, 200, 1100, 650)
     node_window.setWindowTitle("Dreamveil")
 
     node_window.show()

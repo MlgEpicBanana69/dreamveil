@@ -29,25 +29,32 @@ class Server:
         print("============================================")
 
         while not self.closed:
+            # Do not accept new connections once peer count exceeds maximum allowed
+            while len(self.peers) >= self.max_peer_amount:
+                pass
             peer_socket, peer_address = self.socket.accept()
             self.peers[peer_address] = Connection(peer_socket, peer_address)
             print(f"### {peer_address} connected to node")
 
     def connect(self, address):
-        try:
-            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            peer_socket.connect((address, self.port))
-            new_peer = Connection(peer_socket, address)
-            self.peers[address] = new_peer
-            return new_peer
-        except TimeoutError:
+        if len(self.peers) <= self.max_peer_amount:
+            try:
+                peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                peer_socket.connect((address, self.port))
+                new_peer = Connection(peer_socket, address)
+                self.peers[address] = new_peer
+                return new_peer
+            except TimeoutError:
+                print(f"!!! Failed to connect to {address}")
+                return None
+        else:
             print(f"!!! Failed to connect to {address}")
+            print(f"### Server rules do not allow making more than {self.max_peer_amount} connections.")
             return None
 
     def close(self):
         """Terminated the server and all of its ongoing connections"""
         print("### SHUTTING DOWN SERVER")
-
         for peer in self.peers:
             peer.close()
 
@@ -73,9 +80,22 @@ class Connection:
         self.socket.send(message.encode())
 
     def run(self):
+        self.conversation_setup()
         try:
             while not self.closed:
                 message = self.socket.recv(dreamveil.Block.MAX_BLOCK_SIZE)
                 print(message)
         except (ConnectionResetError):
             self.close()
+
+    def conversation_setup(self):
+        self.socket.send(Server.singleton.version.encode())
+        peer_version = self.socket.recv(6).decode()
+        if peer_version != Server.signleton.version:
+            print(f"!!! Peer version {peer_version} is not compatible with the current application version {Server.signleton.version}")
+            # Terminate the connection
+            self.closed = True
+        else:
+            pass
+
+
