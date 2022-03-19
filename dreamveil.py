@@ -7,6 +7,7 @@ import data_structures
 
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
+    EVERYONE_RECIPIENT = ""
 
     # the initializer does not check value validity
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:str, value, signature:str):
@@ -22,8 +23,7 @@ class Transaction:
         # type_prefix
         # Transaction type must be a three letter string
         # crt - currency transaction, this type is for transactions of cryptocurrency
-        # nft - non-fungible token, this type is for media proof of ownership
-        # gnd - generic data, this has no special propeties aside from the fact that it is not filtered
+        # gnd - generic data, text message up to 222 characters in length without any special propeties
         self.type_prefix = None
 
     # Create a digital signature for the transaction
@@ -68,8 +68,6 @@ class Transaction:
 
             if information[0] == "crt":
                 transaction_object = CurrencyTransaction(*information)
-            elif information[0] == "nft":
-                transaction_object = NftTransaction(*information)
             elif information[0] == "gnd":
                 transaction_object = DataTransaction(*information)
             else:
@@ -101,31 +99,18 @@ class CurrencyTransaction(Transaction):
     def get_value(self):
         return self.value
 
-class NftTransaction(Transaction):
-    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:str, value:str, signature:str):
-        super().__init__(sender, receiver, miner_fee, nonce, value, signature)
-        self.type_prefix = "nft"
-
-    #def verify_transaction(self):
-    #    if not super().verify_transaction():
-    #        return False
-
-    def get_value(self):
-        return self.value
-
 class DataTransaction(Transaction):
     def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:str, signature:str):
-        assert len(value) < 222
         super().__init__(sender, receiver, miner_fee, nonce, value, signature)
 
         self.type_prefix = "gnd"
 
-    #def verify_transaction(self):
-    #    if not super().verify_transaction():
-    #        return False
-    #    if len(self.data) == 0 or len(self.data) > 140:
-    #        return False
-    #    return True
+    def verify_transaction(self):
+        if not super().verify_transaction():
+            return False
+        if len(self.data) == 0 or len(self.data) > 222:
+            return False
+        return True
 
     def get_value(self):
         return self.value
@@ -215,7 +200,7 @@ class Block:
 
 class Blockchain:
     TRUST_HEIGHT = 10
-    WALLET_RECORD_TEMPLATE = {"crt": [], "nft": [], "gnd": []}
+    WALLET_RECORD_TEMPLATE = {"crt": [], "gnd": []}
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
     BLOCK_REWARD_SEASON = (0.5*365*24*60*60/AVERAGE_TIME_PER_BLOCK) # 52560
     BLOCK_INITIAL_REWARD = 727
