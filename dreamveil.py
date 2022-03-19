@@ -9,9 +9,10 @@ class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
     # this initializer does not check value validity
-    def __init__(self, inputs:list, outputs:list, miner_fee:int, value, signature:str):
+    def __init__(self, sender:str, inputs:list, outputs:list, miner_fee:int, nonce:str, value, signature:str):
         assert miner_fee >= 0
 
+        self.sender = sender
         self.inputs = inputs
         self.outputs = outputs
         self.miner_fee = miner_fee
@@ -27,7 +28,10 @@ class Transaction:
     # Create a digital signature for the transaction
     # p_key: the private key that is paired with the sender wallet
     def sign(self, p_key:RSA.RsaKey):
-        """Signs the transaction object using RSA"""
+        """Signs the transaction object after generating a random Nonce for it using RSA"""
+        # Generate and set a random Nonce
+        self.nonce = hex(secrets.randbits(256))[1::]
+        # Generate the transaction hash (Including the nonce)
         # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
         transaction_hash = SHA256.new(self.get_contents().encode()).hexdigest()
         # Encrypt the transaction hash using the RSA private key (Digital signature)
@@ -87,17 +91,17 @@ class Transaction:
         return json.dumps(information)
 
 class CurrencyTransaction(Transaction):
-    def __init__(self, inputs:list, outputs:list, miner_fee:int, nonce:int, value:int, signature:str):
+    def __init__(self, sender:str, inputs:list, outputs:list, miner_fee:int, nonce:int, value:int, signature:str):
         assert value > 0
-        super().__init__(inputs, inputs, outputs, miner_fee, nonce, value, signature)
+        super().__init__(sender, inputs, outputs, miner_fee, nonce, value, signature)
         self.type_prefix = "crt"
 
     def get_value(self):
         return self.value
 
 class DataTransaction(Transaction):
-    def __init__(self, sender:str, receiver:str, miner_fee:int, nonce:int, value:str, signature:str):
-        super().__init__([sender], [receiver], miner_fee, nonce, value, signature)
+    def __init__(self, sender:str, recipients:list, miner_fee:int, nonce:int, value:str, signature:str):
+        super().__init__(sender, [], recipients, miner_fee, nonce, value, signature)
 
         self.type_prefix = "gnd"
 
