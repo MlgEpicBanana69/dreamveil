@@ -92,8 +92,8 @@ class Connection:
     def conversation_setup(self):
         self.socket.send(Server.singleton.version.encode())
         peer_version = self.socket.recv(6).decode()
-        if peer_version != Server.signleton.version:
-            print(f"!!! Peer version {peer_version} is not compatible with the current application version {Server.signleton.version}")
+        if peer_version != Server.singleton.version:
+            print(f"!!! Peer version {peer_version} is not compatible with the current application version {Server.singleton.version}")
             # Terminate the connection
             self.closed = True
         else:
