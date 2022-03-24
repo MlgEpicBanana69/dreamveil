@@ -235,14 +235,14 @@ class multifurcasting_tree:
                 highest_child = child
         return highest_child
 
-    def json_dumps_tree(self):
+    def dumps(self):
         return str(self.tree.to_list())
 
     def __repr__(self):
-        return self.json_dumps_tree()
+        return self.dumps()
 
     @staticmethod
-    def json_loads_tree(json_str):
+    def loads(json_str):
         obj = json.loads(json_str)
         return multifurcasting_tree(multifurcasting_tree.peel_json_object(obj))
 
