@@ -214,7 +214,17 @@ class Block:
         return True
 
     def block_has_reward(self):
-        """Checks that the block has one miner reward transaction and only one."""
+        """Checks that the block has one miner reward transaction and only one.
+
+        Note this does not check whether the block prize value is valid relative to the Blockchain
+        as this responsibility falls upon the Blockchain class"""
+        reward_transaction_count = 0
+        for transaction in self.transacions:
+            if type(transaction) == CurrencyTransaction:
+                if transaction.inputs[0] == "BLOCK":
+                    reward_transaction_count += 1
+        return reward_transaction_count == 1
+
 
 
 class Blockchain:
