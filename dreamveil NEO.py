@@ -83,6 +83,9 @@ class CurrencyTransaction(Transaction):
             input_value = self.inputs[input_key]
             if type(input_key) != str or type(input_value) != Decimal:
                 return False
+            if len(input_key) != 64:
+                if not (len(self.inputs) == 1 and self.inputs.keys()[0] == "BLOCK"):
+                    return False
             if not self.zero_knowledge_range_test(input_value):
                 return False
             inputs_sum += input_value
@@ -91,6 +94,8 @@ class CurrencyTransaction(Transaction):
         for output_key in self.outputs.keys():
             output_value = self.outputs[output_key]
             if type(output_key) != str or type(output_value) != Decimal:
+                return False
+            if len(output_key) != 64:
                 return False
             if not self.zero_knowledge_range_test(output_value):
                 return False
@@ -132,7 +137,6 @@ class Block:
     MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
     def __init__(self, previous_block_hash:str, height:int, transactions:list, nonce:int = 0, block_hash:str = ""):
-        assert len(transactions) > 0
         self.previous_block_hash = previous_block_hash
         self.height = height
         self.transacions = transactions
@@ -208,6 +212,10 @@ class Block:
         if antecedent_block.height != self.height+1:
             return False
         return True
+
+    def block_has_reward(self):
+        """Checks that the block has one miner reward transaction and only one."""
+
 
 class Blockchain:
     TRUST_HEIGHT = 10
