@@ -10,13 +10,20 @@ import data_structures
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
-    def __init__(self, sender:str, miner_fee:str, nonce:str, signature:str):
-        assert type(sender) == str and type(miner_fee) == str and type(nonce) == str and type(signature) == str
+    def __init__(self, sender:str, miner_fee:str, inputs:dict, outputs:dict, message:str, nonce:str, signature:str):
+        assert type(sender) == str and type(miner_fee) == str
+        assert type(inputs) == dict and type(outputs) == dict
+        assert type(message) == str and len(message) <= 222
+        assert type(nonce) == str and type(signature) == str
 
         self.sender = sender
         self.miner_fee = Decimal(miner_fee)
+        self.inputs = inputs
+        self.outputs = outputs
+        self.message = message
         self.nonce = nonce
         self.signature = signature
+        assert self.verify_io()
 
     def __repr__(self):
         return self.dumps()
@@ -26,12 +33,12 @@ class Transaction:
             :param: p_key: The private key related to the sender's wallet
             :returns: The produced digital signature"""
         # Generate and set a random Nonce
-        self.nonce = hex(secrets.randbits(256))[1::]
+        self.nonce = hex(secrets.randbits(256))[2::]
         # Generate the transaction hash (Including the nonce)
         # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
         transaction_hash = SHA256.new(self.get_contents().encode()).hexdigest()
         # Encrypt the transaction hash using the RSA private key (Digital signature)
-        digital_signature = hex((int(transaction_hash, base=16) ** p_key.e) % p_key.n)[1::]
+        digital_signature = hex((int(transaction_hash, base=16) ** p_key.e) % p_key.n)[2::]
         # Set and return the generated digital signature
         self.signature = digital_signature
         return digital_signature
@@ -42,46 +49,19 @@ class Transaction:
         try:
             rsa_public_key = RSA.import_key(self.sender)
             computed_hash = SHA256.new(self.dumps().encode()).hexdigest()
-            proposed_hash = hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[1::]
+            proposed_hash = hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[2::]
             if secrets.compare_digest(computed_hash, proposed_hash):
                 return True
         except Exception as err:
             print(f"Verify signature raised exception {err}: {err.args}")
         return False
 
-    @staticmethod
-    def loads(json_str:str):
-        try:
-            assert len(json_str) < Transaction.MAX_TRANSACTION_SIZE
-            information = json.loads(json_str)
-            assert type(information) == list
-            assert len(information) > 1
-            type_prefix = information[0]
-            information = information[1::]
-
-            if type_prefix == "crt":
-                transaction_object = CurrencyTransaction(*information)
-            elif type_prefix == "gnd":
-                transaction_object = DataTransaction(*information)
-            else:
-                raise Exception("Unknown transaction type")
-            assert transaction_object.verify_signature()
-            return transaction_object
-        except (Exception) as err:
-            # TODO: Debug this
-            print("Transaction rejected!")
-
-class CurrencyTransaction(Transaction):
-    def __init__(self, sender:str, miner_fee:str, inputs:dict, outputs:dict, nonce:str = "", signature:str = ""):
-        assert type(inputs) == dict and type(outputs) == dict
-        assert len(inputs) > 0 and len(outputs) > 0
-        super().__init__(sender, miner_fee, nonce, signature)
-        self.inputs = inputs
-        self.outputs = outputs
-        assert self.validate_io()
-
-    def validate_io(self):
+    def verify_io(self):
         """Checks that IO is both in correct format and maintain currency equality"""
+
+        if len(self.inputs) == 0 or len(self.outputs) == 0:
+            return False
+
         inputs_sum = 0
         for input_key in self.inputs.keys():
             try:
@@ -118,29 +98,36 @@ class CurrencyTransaction(Transaction):
         # TODO: implement a zero-knowledge proof
         return value > 0
 
+    @staticmethod
+    def loads(json_str:str):
+        try:
+            assert len(json_str) < Transaction.MAX_TRANSACTION_SIZE
+            information = json.loads(json_str)
+            assert type(information) == list
+            assert len(information) == 7
+
+            assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
+            assert type(information[1]) == str and Decimal(information[1]) >= 0
+            assert type(information[2]) == dict
+            assert type(information[3]) == dict
+            assert type(information[4]) == str and len(information[4]) <= 222
+            assert type(information[5]) == str and len(information[5]) == 64
+            assert type(information[6]) == str and len(information[0]) == 64 and int(information[0], base=16)
+
+            transaction_object = Transaction(*information)
+            assert transaction_object.verify_io()
+            assert transaction_object.verify_signature()
+            return transaction_object
+        except (Exception) as err:
+            # TODO: Debug this
+            print("Transaction rejected!")
+
     def dumps(self):
-        information = ["crt", self.sender, str(self.miner_fee), self.inputs, self.outputs, self.nonce, self.signature]
+        information = [self.sender, str(self.miner_fee), self.inputs, self.outputs, self.message, self.nonce, self.signature]
         return repr(information)
 
     def get_contents(self):
-        information = ["crt", self.sender, str(self.miner_fee), self.inputs, self.outputs, self.nonce]
-        return repr(information)
-
-class DataTransaction(Transaction):
-    def __init__(self, sender:str, miner_fee:str, recipients:list, message:str, nonce:str = "", signature:str = ""):
-        assert type(recipients) == list and type(message) == str
-        assert len(message) > 0 and len(message) <= 222
-        assert len(recipients) > 0
-        super().__init__(sender, miner_fee, nonce, signature)
-        self.recipients = recipients
-        self.message = message
-
-    def dumps(self):
-        information = ["gnd", self.sender, str(self.miner_fee), self.recipients, self.message, self.nonce, self.signature]
-        return repr(information)
-
-    def get_contents(self):
-        information = ["gnd", self.sender, str(self.miner_fee), self.recipients, self.message, self.nonce]
+        information = [self.sender, str(self.miner_fee), self.inputs, self.outputs, self.message, self.nonce]
         return repr(information)
 
 class Block:
@@ -201,12 +188,12 @@ class Block:
                 assert all_signatures.count(signature) == 1
 
             # Verifies that there are no duplicate inputs
-            crts = [crt for crt in transactions if type(crt) == CurrencyTransaction]
-            all_crt_inputs = [crt.inputs.keys() for crt in crts]
+            all_inputs = [transactions.inputs.keys() for crt in transactions]
             # TODO debug this shit
-            all_crt_input_keys = [input_key for crt_input in all_crt_inputs for input_key in crt_input]
-            for input_key in all_crt_input_keys:
-                assert all_crt_input_keys.count(input_key) == 1
+            all_input_keys = [input_key for transaction_input in all_inputs for input_key in transaction_input]
+            for input_key in all_input_keys:
+                if input_key != "BLOCK":
+                    assert all_input_keys.count(input_key) == 1
             information[2] = transactions
             #endregion
 
@@ -242,9 +229,8 @@ class Block:
         as this responsibility falls upon the Blockchain class"""
         reward_transaction_count = 0
         for transaction in self.transactions:
-            if type(transaction) == CurrencyTransaction:
-                if transaction.inputs[0] == "BLOCK":
-                    reward_transaction_count += 1
+            if list(transaction.inputs.keys())[0] == "BLOCK":
+                reward_transaction_count += 1
         return reward_transaction_count == 1
 
     def verify_hash(self):
@@ -268,7 +254,7 @@ class Blockchain:
     def __init__(self, chain, untrusted_timeline=None, unspent_transactions_tree=None):
         assert len(chain) > 0
         self.chain = chain
-        self.crt_record_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
+        self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
         if untrusted_timeline is not None:
             self.untrusted_timeline = untrusted_timeline
         else:
@@ -292,17 +278,32 @@ class Blockchain:
             # Untrusted block has a TRUST_HEIGHT timeline
             # Block is chained into the blockchain since it can now be trusted
             newly_trusted_block_node = self.untrusted_timeline.get_highest_child()
-            self.blockchain.append(newly_trusted_block_node.value)
+            self.chain.append(newly_trusted_block_node.value)
             # Remove the now trusted block from the timeline and advance on its timeline
             self.untrusted_timeline = newly_trusted_block_node
 
-            # Add all of the new currency transactions to the unspent transaction tree.
-            for transaction in self.blockchain[-1].transactions:
-                if type(transaction) == CurrencyTransaction:
-                    transaction_node = data_structures.binary_tree_node(transaction)
-                    self.unspent_transaction_tree.insert(self.unspent_transaction_tree.tree, transaction_node)
-            return True
-        # Block was accepted but is not trusted yet!
+            # For each now accepted transaction in the newly trusted block
+            for transaction in self.chain[-1].transaction:
+                # Mark the transaction as unspent
+                data_structures.binary_tree_node(transaction.signature, dict(zip(transaction.outputs.keys(), len(transaction.outputs)*[True])))
+
+                # For each input the new transaction referenced
+                for heavenly_principle_struck_transaction in transaction.inputs: # All is lost to time (and use) (?)
+                    # Find the node that stores the status of the input-referenced transaction
+                    intree_node = self.unspent_transactions_tree.find(self.unspent_transactions_tree.tree, heavenly_principle_struck_transaction)
+                    try:
+                        # TODO: DEBUG
+                        # An extra precaution check
+                        # This flag should will and must be True and pass.
+                        assert intree_node[transaction.sender]
+                    except AssertionError:
+                        # This error should never trigger as the object checks for the validity of a transaction beforehand.
+                        # (should've not passed Blockchain.verify_block())
+                        print("Error catching double-spending attempt!!!")
+                        raise
+                    intree_node[transaction.sender] = False # We set the transaction's output to spent (Transaction output was used)
+
+        # Block was accepted but is not trusted yet (Added to the untrusted timeline)!
         return None
 
     def _insert_block_to_multifurcasting_tree(self, block, root):
@@ -336,24 +337,22 @@ class Blockchain:
             return False
         # TODO: DEBUG
 
-        assert len(untrusted_timeline_block_trace) > 0
         for transaction in block.transactions:
-            if type(transaction) == CurrencyTransaction:
-                wallet_records = self.transaction_tree.find(transaction)
-                if wallet_records is None:
-                    return False
-                wallet_balance = sum(wallet_records["crt"])
-                # Add to trusted wallet_balance the untrusted timeline transaction changes
-                # this is ment to guarantee timeline transaction consistency used for the verification off the block
-                for traced_block in untrusted_timeline_block_trace[0:-1:]:
-                    for traced_transaction in traced_block:
-                        if type(traced_transaction) == CurrencyTransaction:
-                            if traced_transaction.sender == transaction.sender:
-                                wallet_balance -= traced_transaction.value
-                            elif traced_transaction.reciever == transaction.sender:
-                                wallet_balance += traced_transaction.value
+            wallet_records = self.transaction_tree.find(transaction)
+            if wallet_records is None:
+                return False
+            wallet_balance = sum(wallet_records["crt"])
+            # Add to trusted wallet_balance the untrusted timeline transaction changes
+            # this is ment to guarantee timeline transaction consistency used for the verification off the block
+            # TODO: check why [0:-1:] was used
+            for traced_block in untrusted_timeline_block_trace[0:-1:]:
+                for traced_transaction in traced_block:
+                    if traced_transaction.sender == transaction.sender:
+                        wallet_balance -= traced_transaction.value
+                    elif traced_transaction.reciever == transaction.sender:
+                            wallet_balance += traced_transaction.value
 
-                if wallet_balance < transaction.value:
+            if wallet_balance < transaction.value:
                     return False
         return True
 
@@ -387,4 +386,9 @@ class Blockchain:
 
 # debugging
 if __name__ == '__main__':
-    pass
+    tree = data_structures.AVL()
+    tree.insert(tree.tree, data_structures.binary_tree_node("pog"))
+    print(tree)
+    edit = tree.find(tree.tree, "pog")
+    edit.value = "champ"
+    print(tree)
