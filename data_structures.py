@@ -14,6 +14,11 @@ class binary_tree_node:
     def __repr__(self):
         return self.json_dumps_node()
 
+    def repr_tree(self):
+        l = self.left.repr_tree() if self.left is not None else None
+        r = self.right.repr_tree() if self.right is not None else None
+        return repr({self.key: (l, r)})
+
     def json_dumps_node(self):
         return json.dumps([self.key, self.value])
 
@@ -28,6 +33,9 @@ class binary_tree_node:
 class AVL:
     def __init__(self):
         self.tree = None
+
+    def __repr__(self):
+        return self.tree.repr_tree()
 
     def find(self, root, key):
         """Finds and returns the node of a given key in the tree. Returns None if does not exist"""
@@ -63,15 +71,19 @@ class AVL:
 
         out = root
         if balance_factor > 1:
-            if root.left is not None:
-                out = self.right_rotate(root)
-            else:
-                out = self.left_rotate(root)
+            if root.right.left is not None:
+                temp = root.right
+                root.right = root.right.left
+                root.right.right = temp
+                root.right.right.left = None
+            out = self.left_rotate(root)
         elif balance_factor < -1:
-            if root.right is not None:
-                out = self.right_rotate(root)
-            else:
-                out = self.left_rotate(root)
+            if root.left.right is not None:
+                temp = root.left
+                root.left = root.left.right
+                root.left.left = temp
+                root.left.left.right = None
+            out = self.right_rotate(root)
         if root == self.tree:
             self.tree = out
         return out
@@ -88,7 +100,8 @@ class AVL:
         root.left.right = None
 
         root.left.height = 1 + max(self.get_height(root.left.right), self.get_height(root.left.left))
-        root.right.height = 1 + max(self.get_height(root.right.right), self.get_height(root.right.left))
+        if root.right is not None:
+            root.right.height = 1 + max(self.get_height(root.right.right), self.get_height(root.right.left))
         root.height = 1 + max(self.get_height(root.right), self.get_height(root.left))
         return root
 
@@ -99,7 +112,8 @@ class AVL:
         root.right.left = None
 
         root.right.height = 1 + max(self.get_height(root.right.left), self.get_height(root.right.right))
-        root.left.height = 1 + max(self.get_height(root.left.left), self.get_height(root.left.right))
+        if root.left is not None:
+            root.left.height = 1 + max(self.get_height(root.left.left), self.get_height(root.left.right))
         root.height = 1 + max(self.get_height(root.left), self.get_height(root.right))
         return root
 

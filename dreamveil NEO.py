@@ -387,8 +387,9 @@ class Blockchain:
 # debugging
 if __name__ == '__main__':
     tree = data_structures.AVL()
-    tree.insert(tree.tree, data_structures.binary_tree_node("pog"))
-    print(tree)
-    edit = tree.find(tree.tree, "pog")
-    edit.value = "champ"
+    tree.insert(tree.tree, data_structures.binary_tree_node(50))
+    tree.insert(tree.tree, data_structures.binary_tree_node(10))
+    tree.insert(tree.tree, data_structures.binary_tree_node(20))
+    tree.insert(tree.tree, data_structures.binary_tree_node(30))
+    tree.insert(tree.tree, data_structures.binary_tree_node(25))
     print(tree)
