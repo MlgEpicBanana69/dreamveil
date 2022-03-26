@@ -265,10 +265,10 @@ class Blockchain:
 
     # Transaction record tree
     # Transaction signature: (spent, value)
-    def __init__(self, chain, untrusted_timeline=None, crt_record_tree=None):
+    def __init__(self, chain, untrusted_timeline=None, unspent_transactions_tree=None):
         assert len(chain) > 0
         self.chain = chain
-        self.crt_record_tree = crt_record_tree if crt_record_tree is not None else data_structures.AVL()
+        self.crt_record_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
         if untrusted_timeline is not None:
             self.untrusted_timeline = untrusted_timeline
         else:
@@ -296,53 +296,14 @@ class Blockchain:
             # Remove the now trusted block from the timeline and advance on its timeline
             self.untrusted_timeline = newly_trusted_block_node
 
-            # Record all of the transactions in the newly added block in the transaction AVL tree
-            transactions = self.blockchain[-1].transactions
-            # Add the special miner fees transaction
-            transactions.append(CurrencyTransaction(None, self.miner, None, None, self.calculate_block_reward(block), None))
-            # Go over all of the block's transactions
-            for i, transaction in enumerate(transactions):
-                if transaction.sender:
-                    # See if the sender is already recorded in the AVL tree
-                    wallet_records = self.transaction_tree.find(transaction.sender)
-                    # Sender is already in the AVL tree
-                    if wallet_records is not None:
-                        records = wallet_records.value
-                    # Sender is not on the tree
-                    else:
-                        # Generate a new AVL tree node
-                        wallet_records = data_structures.binary_tree_node(transaction.sender)
-                        # Set records to the records new template
-                        records = Blockchain.WALLET_RECORD_TEMPLATE
-                    # New record (|value|, polarity, block index, transaction index)
-                    # negativity - if a transaction is negative (1) or positive (0).
-                    # Append new transaction to the sender wallet records
-                    records[transaction.type_prefix].append((transaction.value, 1, block.height, i))
-                    # Set tree node value to the updated records
-                    wallet_records.value = records
-                    # Insert the updated tree node into the transaction AVL tree
-                    self.transaction_tree.insert(self.transaction_tree, wallet_records)
-
-                if transaction.receiver:
-                    # See if the sender is already recorded in the AVL tree
-                    wallet_records = self.transaction_tree.find(transaction.receiver)
-                    # Sender is already in the AVL tree
-                    if wallet_records is not None:
-                        records = wallet_records.value
-                    # Sender is not on the tree
-                    else:
-                        # Generate a new AVL tree node
-                        wallet_records = data_structures.binary_tree_node(transaction.sender)
-                        # Set records to the records new template
-                        records = Blockchain.WALLET_RECORD_TEMPLATE
-                    # New record (|value|, polarity, block index, transaction index)
-                    # negativity - if a transaction is negative (1) or positive (0).
-                    # Append new transaction to the sender wallet records
-                    records[transaction.type_prefix].append((transaction.value, 0, block.height, i))
-                    # Set tree node value to the updated records
-                    wallet_records.value = records
-                    # Insert the updated tree node into the transaction AVL tree
-                    self.transaction_tree.insert(self.transaction_tree, wallet_records)
+            # Add all of the new currency transactions to the unspent transaction tree.
+            for transaction in self.blockchain[-1].transactions:
+                if type(transaction) == CurrencyTransaction:
+                    transaction_node = data_structures.binary_tree_node(transaction)
+                    self.unspent_transaction_tree.insert(self.unspent_transaction_tree.tree, transaction_node)
+            return True
+        # Block was accepted but is not trusted yet!
+        return None
 
     def _insert_block_to_multifurcasting_tree(self, block, root):
         if root is None:
