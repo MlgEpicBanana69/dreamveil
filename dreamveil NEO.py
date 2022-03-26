@@ -1,7 +1,8 @@
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 import secrets
-from decimal import *
+import decimal
+from decimal import Decimal
 import json
 
 import data_structures
@@ -9,11 +10,13 @@ import data_structures
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
-    def __init__(self, sender:str, miner_fee:Decimal):
+    def __init__(self, sender:str, miner_fee:str, nonce:str, signature:str):
+        assert type(sender) == str and type(miner_fee) == str and type(nonce) == str and type(signature) == str
+
         self.sender = sender
-        self.miner_fee = miner_fee
-        self.nonce = None
-        self.signature = None
+        self.miner_fee = Decimal(miner_fee)
+        self.nonce = nonce
+        self.signature = signature
 
     def __repr__(self):
         return self.dumps()
@@ -66,12 +69,13 @@ class Transaction:
             return transaction_object
         except (Exception) as err:
             # TODO: Debug this
-            print("Failed loading transaction from json.")
+            print("Transaction rejected!")
 
 class CurrencyTransaction(Transaction):
-    def __init__(self, sender:str, miner_fee:Decimal, inputs:dict, outputs:dict, nonce:str = "", signature:str = ""):
+    def __init__(self, sender:str, miner_fee:str, inputs:dict, outputs:dict, nonce:str = "", signature:str = ""):
+        assert type(inputs) == dict and type(outputs) == dict
         assert len(inputs) > 0 and len(outputs) > 0
-        super().__init__(sender, miner_fee)
+        super().__init__(sender, miner_fee, nonce, signature)
         self.inputs = inputs
         self.outputs = outputs
         assert self.validate_io()
@@ -80,20 +84,26 @@ class CurrencyTransaction(Transaction):
         """Checks that IO is both in correct format and maintain currency equality"""
         inputs_sum = 0
         for input_key in self.inputs.keys():
-            input_value = self.inputs[input_key]
-            if type(input_key) != str or type(input_value) != Decimal:
+            try:
+                input_value = Decimal(self.inputs[input_key])
+            except decimal.InvalidOperation:
+                return False
+            if type(input_key) != str:
                 return False
             if len(input_key) != 64:
-                if not (len(self.inputs) == 1 and self.inputs.keys()[0] == "BLOCK"):
+                if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK"):
                     return False
             if not self.zero_knowledge_range_test(input_value):
                 return False
             inputs_sum += input_value
 
-        outputs_sum = 0
+        outputs_sum = self.miner_fee
         for output_key in self.outputs.keys():
-            output_value = self.outputs[output_key]
-            if type(output_key) != str or type(output_value) != Decimal:
+            try:
+                output_value = Decimal(self.outputs[output_key])
+            except decimal.InvalidOperation:
+                return False
+            if type(output_key) != str:
                 return False
             if len(output_key) != 64:
                 return False
@@ -109,37 +119,39 @@ class CurrencyTransaction(Transaction):
         return value > 0
 
     def dumps(self):
-        information = ["crt", self.sender, self.miner_fee, self.inputs, self.outputs, self.nonce, self.signature]
-        return json.dump(information)
+        information = ["crt", self.sender, str(self.miner_fee), self.inputs, self.outputs, self.nonce, self.signature]
+        return repr(information)
 
     def get_contents(self):
-        information = ["crt", self.sender, self.miner_fee, self.inputs, self.outputs, self.nonce]
-        return json.dump(information)
+        information = ["crt", self.sender, str(self.miner_fee), self.inputs, self.outputs, self.nonce]
+        return repr(information)
 
 class DataTransaction(Transaction):
-    def __init__(self, sender:str, miner_fee:Decimal, recipients:list, message:str, nonce:str = "", signature:str = ""):
+    def __init__(self, sender:str, miner_fee:str, recipients:list, message:str, nonce:str = "", signature:str = ""):
+        assert type(recipients) == list and type(message) == str
         assert len(message) > 0 and len(message) <= 222
         assert len(recipients) > 0
-        super().__init__(sender, miner_fee)
+        super().__init__(sender, miner_fee, nonce, signature)
         self.recipients = recipients
         self.message = message
 
     def dumps(self):
-        information = ["gnd", self.sender, self.miner_fee, self.recipients, self.message, self.nonce, self.signature]
-        return json.dump(information)
+        information = ["gnd", self.sender, str(self.miner_fee), self.recipients, self.message, self.nonce, self.signature]
+        return repr(information)
 
     def get_contents(self):
-        information = ["gnd", self.sender, self.miner_fee, self.recipients, self.message, self.nonce]
-        return json.dump(information)
+        information = ["gnd", self.sender, str(self.miner_fee), self.recipients, self.message, self.nonce]
+        return repr(information)
 
 class Block:
-    MAX_TRANSACTIONS_LENGTH = 727
     MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
     def __init__(self, previous_block_hash:str, height:int, transactions:list, nonce:int = 0, block_hash:str = ""):
+        assert type(previous_block_hash) == str and type(height) == int and type(transactions) == list and type(nonce) == int and type(block_hash) == str
+
         self.previous_block_hash = previous_block_hash
         self.height = height
-        self.transacions = transactions
+        self.transactions = transactions
         self.nonce = nonce
         self.block_hash = block_hash
 
@@ -154,9 +166,13 @@ class Block:
         self.nonce = 0
         self.transactions.remove(transaction)
 
-    def dumps(self):
-        information = [self.previous_block_hash, self.height, self.nonce, self.miner, self.transacions, self.block_hash]
-        return json.dumps(information)
+    def get_contents(self):
+        information = [self.previous_block_hash, self.height, self.transactions, self.nonce]
+        return repr(information)
+
+    def hash_block(self):
+        self.block_hash = SHA256.new(self.get_contents().encode()).hexdigest()
+        return self.block_hash
 
     @staticmethod
     def loads(json_str):
@@ -165,45 +181,51 @@ class Block:
             assert len(json_str.encode()) <= Block.MAX_BLOCK_SIZE
             information = json.loads(json_str)
             assert type(information) == list
-            assert len(information) == 6
+            assert len(information) == 5
             assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
-            # Nonce
-            assert information[1] >= 0
             # Block height
-            assert information[2] >= 0
-            # TODO: Update once wallet format is defined
-            assert information[3] # Miner wallet
-            #region verify transactions
+            assert information[1] >= 0
+
+            #      information[2]
+            # region verify transactions
             # Read and interpret each transaction object seperately
-            assert type(information[4]) == list
+            assert len(information[2]) > 0 and type(information[2]) == list
             transactions = []
-            for transaction in information[4]:
-                transaction.append(Transaction.loads(repr(transaction)))
-            # Checks that the transaction limit was not reached
-            assert len(transactions) <= Block.MAX_TRANSACTIONS_LENGTH
+            # TODO: Debug this bs
+            for transaction in information[2]:
+                transactions.append(Transaction.loads(transaction))
 
             # Verifies that there are no duplicate transactions
             all_signatures = [t.signature for t in transactions]
             for signature in all_signatures:
                 assert all_signatures.count(signature) == 1
 
-            # Verifies that there is one transfer transaction per sender
-            transferative_transactions = [transfer for transfer in transactions if type(transaction) != DataTransaction]
-            transferative_transactions_senders = [transfer.sender for transfer in transferative_transactions]
-            for sender in transferative_transactions_senders:
-                assert transferative_transactions_senders.count(sender) == 1
+            # Verifies that there are no duplicate inputs
+            crts = [crt for crt in transactions if type(crt) == CurrencyTransaction]
+            all_crt_inputs = [crt.inputs.keys() for crt in crts]
+            # TODO debug this shit
+            all_crt_input_keys = [input_key for crt_input in all_crt_inputs for input_key in crt_input]
+            for input_key in all_crt_input_keys:
+                assert all_crt_input_keys.count(input_key) == 1
+            information[2] = transactions
             #endregion
-            information[4] = transactions
-            assert type(information[5]) == str and len(information[5]) == 64 and int(information[5], base=16)
 
-            return Block(*information)
+            # Nonce
+            assert information[3] >= 0
+
+            assert type(information[4]) == str and len(information[4]) == 64 and int(information[4], base=16)
+            output = Block(*information)
+            assert output.verify_hash()
+            assert output.verify_block_has_reward()
+
+            return output
         except Exception as err:
-            print("Failed to create Block from JSON. (Invalid data)")
+            print("Block rejected!")
             raise err
 
-    def hash_block(self):
-        self.block_hash = SHA256.new(self.dumps().encode()).hexdigest()
-        return self.block_hash
+    def dumps(self):
+        information = [self.previous_block_hash, self.height, self.transactions, self.nonce, self.block_hash]
+        return repr(information)
 
     def do_blocks_chain(self, antecedent_block):
         """Checks if antecedent_block << self is a valid chain"""
@@ -213,19 +235,25 @@ class Block:
             return False
         return True
 
-    def block_has_reward(self):
+    def verify_block_has_reward(self):
         """Checks that the block has one miner reward transaction and only one.
 
         Note this does not check whether the block prize value is valid relative to the Blockchain
         as this responsibility falls upon the Blockchain class"""
         reward_transaction_count = 0
-        for transaction in self.transacions:
+        for transaction in self.transactions:
             if type(transaction) == CurrencyTransaction:
                 if transaction.inputs[0] == "BLOCK":
                     reward_transaction_count += 1
         return reward_transaction_count == 1
 
-
+    def verify_hash(self):
+        """Verifies that the hash propety matches the actual hash of the block's"""
+        proposed_hash = self.block_hash
+        computed_hash = self.hash_block()
+        output = secrets.compare_digest(proposed_hash, computed_hash)
+        self.block_hash = proposed_hash
+        return output
 
 class Blockchain:
     TRUST_HEIGHT = 10
@@ -371,7 +399,7 @@ class Blockchain:
     def dumps(self):
         # TODO Make blockchain dumps and loads
         information = [self.chain, self.untrusted_timeline.json_dumps_tree(), self.transaction_tree.dumps_avl(), ]
-        return json.dumps(information)
+        return repr(information)
 
     @staticmethod
     def loads(json_str):
@@ -398,7 +426,4 @@ class Blockchain:
 
 # debugging
 if __name__ == '__main__':
-    t = CurrencyTransaction("me", 0, {"sex":Decimal(5),}, {"amogus":Decimal(5),})
-    t.sign()
-
-    b = Block("L", 0, {"pog": 5})
+    pass
