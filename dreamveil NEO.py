@@ -392,4 +392,7 @@ if __name__ == '__main__':
     tree.insert(tree.tree, data_structures.binary_tree_node(20))
     tree.insert(tree.tree, data_structures.binary_tree_node(30))
     tree.insert(tree.tree, data_structures.binary_tree_node(25))
-    print(tree)
+    cringe = data_structures.AVL.loads(tree.dumps())
+    print(tree.dumps())
+    print(cringe)
+    print(cringe == tree)

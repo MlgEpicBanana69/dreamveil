@@ -12,18 +12,13 @@ class binary_tree_node:
         self.height = 1
 
     def __repr__(self):
-        return self.json_dumps_node()
+        return self.dumps()
 
-    def repr_tree(self):
-        l = self.left.repr_tree() if self.left is not None else None
-        r = self.right.repr_tree() if self.right is not None else None
-        return repr({self.key: (l, r)})
-
-    def json_dumps_node(self):
+    def dumps(self):
         return json.dumps([self.key, self.value])
 
     @staticmethod
-    def json_loads_node(json_str):
+    def loads(json_str):
         if json_str == "None" or json_str is None:
             return None
         json_obj = json.loads(json_str)
@@ -33,9 +28,6 @@ class binary_tree_node:
 class AVL:
     def __init__(self):
         self.tree = None
-
-    def __repr__(self):
-        return self.tree.repr_tree()
 
     def find(self, root, key):
         """Finds and returns the node of a given key in the tree. Returns None if does not exist"""
@@ -120,15 +112,15 @@ class AVL:
     def get_balance(self, root):
         return self.get_height(root.right) - self.get_height(root.left)
 
-    def dumps_avl(self, curr_parents=None):
+    def dumps(self, curr_parents=None):
         output = ""
         if self.tree is None:
                 return ""
         elif self.tree.left is None and self.tree.right is None:
-            return self.tree.json_dumps_node()
+            return self.tree.dumps()
 
         if curr_parents is None:
-            output = f"{str(self.tree.json_dumps_node())}"
+            output = f"{str(self.tree.dumps())}"
             curr_parents = [self.tree]
         if curr_parents == len(curr_parents) * [None]:
             return output
@@ -136,8 +128,8 @@ class AVL:
         children = []
         for parent in curr_parents:
             if parent is not None:
-                output += "\x00" + (parent.left.json_dumps_node() if parent.left is not None else "None")
-                output += "\x00" + (parent.right.json_dumps_node() if parent.right is not None else "None")
+                output += "\x00" + (parent.left.dumps() if parent.left is not None else "None")
+                output += "\x00" + (parent.right.dumps() if parent.right is not None else "None")
 
                 children.append(parent.left)
                 children.append(parent.right)
@@ -145,7 +137,7 @@ class AVL:
                 output += "\x00None\x00None"
                 children.append(None)
                 children.append(None)
-        next_rec = self.dumps_avl(children)
+        next_rec = self.dumps(children)
         if next_rec == "":
             return "\x00"
         elif next_rec == "\x00":
@@ -155,8 +147,8 @@ class AVL:
             return output
 
     @staticmethod
-    def loads_avl(avl_json):
-        all_nodes = [binary_tree_node.json_loads_node(node) for node in avl_json.split("\x00")]
+    def loads(avl_json):
+        all_nodes = [binary_tree_node.loads(node) for node in avl_json.split("\x00")]
         output_tree = AVL()
         output_tree.tree = all_nodes[0]
         for i in range(int(math.log(len(all_nodes), 2))):
@@ -177,10 +169,6 @@ class AVL:
                     else:
                         parent.right = curr_children[c]
         return output_tree
-
-    @staticmethod
-    def _rec_loads(self, parents:list, children:list):
-        return
 
 class multifurcasting_node:
     def __init__(self, value):
@@ -251,9 +239,6 @@ class multifurcasting_tree:
 
     def dumps(self):
         return str(self.tree.to_list())
-
-    def __repr__(self):
-        return self.dumps()
 
     @staticmethod
     def loads(json_str):
