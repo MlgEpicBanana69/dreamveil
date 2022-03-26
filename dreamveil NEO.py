@@ -13,7 +13,7 @@ class Transaction:
     def __init__(self, sender:str, miner_fee:str, inputs:dict, outputs:dict, message:str, nonce:str, signature:str):
         assert type(sender) == str and type(miner_fee) == str
         assert type(inputs) == dict and type(outputs) == dict
-        assert type(message) == str and len(message) <= 222
+        assert type(message) == str
         assert type(nonce) == str and type(signature) == str
 
         self.sender = sender
@@ -187,13 +187,14 @@ class Block:
             for signature in all_signatures:
                 assert all_signatures.count(signature) == 1
 
-            # Verifies that there are no duplicate inputs
-            all_inputs = [transactions.inputs.keys() for crt in transactions]
-            # TODO debug this shit
-            all_input_keys = [input_key for transaction_input in all_inputs for input_key in transaction_input]
-            for input_key in all_input_keys:
-                if input_key != "BLOCK":
-                    assert all_input_keys.count(input_key) == 1
+            # Verifies that there are no duplicate input-sender pairs
+            decayed_outputs = []
+            for transaction in transactions:
+                for transaction_input in transaction.inputs.keys():
+                    decayed_output = (transaction_input, transaction.sender)
+                    assert decayed_output not in decayed_outputs
+                    decayed_outputs.append(decayed_output)
+
             information[2] = transactions
             #endregion
 
@@ -332,6 +333,7 @@ class Blockchain:
         This function verifies that the sender of each transaction in the block has the resources to carry it out.
         Transactions do not recognize other transactions in the same block to prevent order frauding
         """
+        # TODO: Adopt new input system
         untrusted_timeline_block_trace = self.untrusted_timeline.trace(block)
         if untrusted_timeline_block_trace is None:
             return False
