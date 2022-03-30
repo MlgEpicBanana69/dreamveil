@@ -335,60 +335,33 @@ class Blockchain:
         Transactions do not recognize other transactions in the same block to prevent order frauding
         """
 
-        # For each now accepted transaction in the newly trusted block
-        for transaction in block.transaction:
-            # Mark the transaction as unspent
-            data_structures.binary_tree_node(transaction.signature, dict(zip(transaction.outputs.keys(), len(transaction.outputs)*[True])))
-
-            # For each input the new transaction referenced
-            for heavenly_principle_struck_transaction in transaction.inputs: # All is lost to time (and use) (?)
-                # Find the node that stores the status of the input-referenced transaction
-                intree_node = self.unspent_transactions_tree.find(self.unspent_transactions_tree.tree, heavenly_principle_struck_transaction)
-                try:
-                    # TODO: DEBUG
-                    # An extra precaution check
-                    # This flag should will and must be True and pass.
-                    assert intree_node[transaction.sender]
-                except AssertionError:
-                    # This error should never trigger as the object checks for the validity of a transaction beforehand.
-                    # (should've not passed Blockchain.verify_block())
-                    print("Error catching double-spending attempt!!!")
-                    raise
-                intree_node[transaction.sender] = False # We set the transaction's output to spent (Transaction output was used)
-
-        # cringe
+        block_fees = Decimal(0)
+        miner_reward_transaction = None
+        # For each transaction in the block
         for transaction in block.transactions:
+            # Go over all of the inputs referenced in the block.
             for transaction_input in transaction.inputs.keys():
-                try:
-                    transaction_node = work_unspent_tree.find(transaction.signature)
-                    assert transaction_node is not None
-                    assert transaction_node.value[transaction.sender] == True
-                except (AssertionError, KeyError):
-                    return False
-        
-        # TODO: Adopt new input system
-        untrusted_timeline_block_trace = self.untrusted_timeline.trace(block)
-        if untrusted_timeline_block_trace is None:
+                if transaction_input != "BLOCK":
+                    transaction_node = self.untrusted_timeline.find(self.untrusted_timeline.tree, transaction_input)
+                    if transaction_input is None:
+                        print("Block rejected in verify_block (referenced transaction does not exist)")
+                        return False
+                    if transaction.sender not in transaction_node.value.keys():
+                        print("Block rejected in verify_block (referenced transaction exists but the output does not)")
+                        return False
+                    if transaction_node.value[transaction.sender] != True:
+                        print("Block rejected in verify_block (given output was already spent.)")
+                        return False
+                else:
+                    miner_reward_transaction = transaction
+            block_fees += Decimal(transaction.miner_fee)
+
+        proposed_block_reward = Decimal(0)
+        for output in miner_reward_transaction.outputs.values():
+            proposed_block_reward += Decimal(output)
+        if proposed_block_reward != Blockchain.calculate_block_reward(block.height) + block_fees:
+            print("Block rejected in verify_block (Miner transaction does not evaluate to the correct amount)")
             return False
-        # TODO: DEBUG
-
-        for transaction in block.transactions:
-            wallet_records = self.transaction_tree.find(transaction)
-            if wallet_records is None:
-                return False
-            wallet_balance = sum(wallet_records["crt"])
-            # Add to trusted wallet_balance the untrusted timeline transaction changes
-            # this is ment to guarantee timeline transaction consistency used for the verification off the block
-            # TODO: check why [0:-1:] was used
-            for traced_block in untrusted_timeline_block_trace[0:-1:]:
-                for traced_transaction in traced_block:
-                    if traced_transaction.sender == transaction.sender:
-                        wallet_balance -= traced_transaction.value
-                    elif traced_transaction.reciever == transaction.sender:
-                            wallet_balance += traced_transaction.value
-
-            if wallet_balance < transaction.value:
-                    return False
         return True
 
     def dumps(self):
