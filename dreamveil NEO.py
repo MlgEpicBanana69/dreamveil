@@ -268,15 +268,15 @@ class Blockchain:
         Valid blocks first move into the untrusted timeline.
         The block is chained to the blockchain once it reaches TRUST_HEIGHT in the untrusted timeline
         On success returns True. Returns False otherwise"""
-        if not self.verify_block(block):
-            # Block is invalid
-            return False
         if not self.add_block_to_untrusted_timeline(self.untrusted_timeline, block):
             # Block is unrelated to the main chain
             # TODO: Check/show that block(x+1) cannot practically arrive before block(x)
             return False
 
         if self.untrusted_timeline.calculate_height() == Blockchain.TRUST_HEIGHT+1:
+            if not self.verify_block(block):
+                return False
+
             # Untrusted block has a TRUST_HEIGHT timeline
             # Block is chained into the blockchain since it can now be trusted
             newly_trusted_block_node = self.untrusted_timeline.get_highest_child()
@@ -334,11 +334,9 @@ class Blockchain:
         This function verifies that the sender of each transaction in the block has the resources to carry it out.
         Transactions do not recognize other transactions in the same block to prevent order frauding
         """
-        work_unspent_tree = copy.deepcopy(self.unspent_transactions_tree)
-        block_timeline = self.untrusted_timeline.trace(block)[:-1:]
 
         # For each now accepted transaction in the newly trusted block
-        for transaction in self.chain[-1].transaction:
+        for transaction in block.transaction:
             # Mark the transaction as unspent
             data_structures.binary_tree_node(transaction.signature, dict(zip(transaction.outputs.keys(), len(transaction.outputs)*[True])))
 
@@ -357,7 +355,6 @@ class Blockchain:
                     print("Error catching double-spending attempt!!!")
                     raise
                 intree_node[transaction.sender] = False # We set the transaction's output to spent (Transaction output was used)
-
 
         # cringe
         for transaction in block.transactions:
