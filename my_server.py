@@ -66,19 +66,28 @@ class Connection:
         self.socket = socket
         self.address = address
         self.closed = False
+        self.setup = False
+
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
 
     def close(self):
-        self.socket.close()
         self.closed = True
+        self.socket.close()
 
         print(f"### Closed connection with {self.address}")
 
         del Server.singleton.peers[self.address]
 
     def send(self, message:str):
-        self.socket.send(message.encode())
+        # Halt sending messages until the connection setup is made
+        while not self.setup and not self.closed:
+            pass
+
+        if not self.closed:
+            self.socket.send(message.encode())
+        else:
+            raise Exception("Cannot send message. Connection is already closed.")
 
     def run(self):
         self.conversation_setup()
@@ -95,8 +104,9 @@ class Connection:
         if peer_version != Server.singleton.version:
             print(f"!!! Peer version {peer_version} is not compatible with the current application version {Server.singleton.version}")
             # Terminate the connection
-            self.closed = True
+            self.setup = False
+            self.close()
         else:
-            pass
-
-
+            self.setup = True
+            print(f"### Connection with {self.address} completed setup (version: {Server.singleton.version})")
+            return

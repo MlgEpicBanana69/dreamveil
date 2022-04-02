@@ -10,7 +10,7 @@ VERSION = application_config["METADATA"]["version"]
 
 server = Server(VERSION, application_config["SERVER"]["address"])
 
-p = server.connect("192.168.1.36")
-p.send("hello")
+for p in server.peers.values():
+    p.send("hello")
 
 
