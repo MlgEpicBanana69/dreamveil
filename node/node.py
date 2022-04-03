@@ -1,6 +1,6 @@
 import dreamveil
 
-from my_server import Server
+from server import Server
 import configparser
 import ipaddress
 
