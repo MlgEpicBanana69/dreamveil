@@ -8,6 +8,7 @@ import copy
 
 import data_structures
 
+
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
@@ -97,7 +98,7 @@ class Transaction:
 
     def zero_knowledge_range_test(self, value):
         # TODO: implement a zero-knowledge proof
-        return value > 0
+        return value >= 0
 
     @staticmethod
     def loads(json_str:str):
@@ -253,8 +254,7 @@ class Blockchain:
 
     # Transaction record tree
     # Transaction signature: (spent, value)
-    def __init__(self, chain, untrusted_timeline=None, unspent_transactions_tree=None):
-        assert len(chain) > 0
+    def __init__(self, chain=[], untrusted_timeline=None, unspent_transactions_tree=None):
         self.chain = chain
         self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
         if untrusted_timeline is not None:
@@ -268,12 +268,15 @@ class Blockchain:
         Valid blocks first move into the untrusted timeline.
         The block is chained to the blockchain once it reaches TRUST_HEIGHT in the untrusted timeline
         On success returns True. Returns False otherwise"""
-        if not self.add_block_to_untrusted_timeline(self.untrusted_timeline, block):
-            # Block is unrelated to the main chain
-            # TODO: Check/show that block(x+1) cannot practically arrive before block(x)
-            return False
 
-        if self.untrusted_timeline.calculate_height() == Blockchain.TRUST_HEIGHT+1:
+
+        if len(self.chain) > 0:
+            if not self.add_block_to_untrusted_timeline(self.untrusted_timeline, block):
+                # Block is unrelated to the main chain
+                # TODO: Check/show that block(x+1) cannot practically arrive before block(x)
+                return False
+
+        if self.untrusted_timeline.calculate_height() == Blockchain.TRUST_HEIGHT+1 or len(self.chain) == 0:
             if not self.verify_block(block):
                 return False
 
@@ -366,14 +369,17 @@ class Blockchain:
 
     def dumps(self):
         # TODO Make blockchain dumps and loads
-        information = [self.chain, self.untrusted_timeline.json_dumps_tree(), self.transaction_tree.dumps_avl(), ]
+        information = [self.chain, self.untrusted_timeline.dumps(), self.unspent_transactions_tree.dumps()]
         return repr(information)
 
     @staticmethod
     def loads(json_str):
-        json_obj = json.loads(json_str)
-        assert type(json_obj) == list
-        return Blockchain(*json_obj)
+        try:
+            json_obj = json.loads(json_str)
+            assert type(json_obj) == list
+            return Blockchain(*json_obj)
+        except Exception as err:
+            raise ValueError(f"type(err)" + "err.args")
 
     @staticmethod
     def calculate_block_reward(height):
@@ -391,6 +397,8 @@ class Blockchain:
         for transaction in block_reward.transactions:
             block_reward += transaction.miner_fee
         return Decimal(block_reward)
+
+GENESIS_BLOCK = Block("")
 
 # debugging
 if __name__ == '__main__':
