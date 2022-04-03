@@ -398,17 +398,8 @@ class Blockchain:
             block_reward += transaction.miner_fee
         return Decimal(block_reward)
 
-GENESIS_BLOCK = Block("")
+GENESIS_BLOCK = Block("a76b338874117acd5c4151e0f532cb7bd4d84764d818a52d61acdb44aa7a4a16", 0, [Transaction("", 0, {"BLOCK": Blockchain.BLOCK_INITIAL_REWARD}, {"", Blockchain.BLOCK_INITIAL_REWARD}, "", "")], 0, "a76b338874117acd5c4151e0f532cb7bd4d84764d818a52d61acdb44aa7a4a16")
 
 # debugging
 if __name__ == '__main__':
-    tree = data_structures.AVL()
-    tree.insert(tree.tree, data_structures.binary_tree_node(50))
-    tree.insert(tree.tree, data_structures.binary_tree_node(10))
-    tree.insert(tree.tree, data_structures.binary_tree_node(20))
-    tree.insert(tree.tree, data_structures.binary_tree_node(30))
-    tree.insert(tree.tree, data_structures.binary_tree_node(25))
-    cringe = data_structures.AVL.loads(tree.dumps())
-    print(tree.dumps())
-    print(cringe)
-    print(cringe == tree)
+    pass

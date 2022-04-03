@@ -1,0 +1,9 @@
+Dreamveil - The coolest blockchain, 12th grade cyber project.
+
+
+
+
+
+The Lord.
+
+GENESIS_BLOCK = Block("a76b338874117acd5c4151e0f532cb7bd4d84764d818a52d61acdb44aa7a4a16", 0, [Transaction("", 0, {"BLOCK": Blockchain.BLOCK_INITIAL_REWARD}, {"", Blockchain.BLOCK_INITIAL_REWARD}, "", "")], 0, "a76b338874117acd5c4151e0f532cb7bd4d84764d818a52d61acdb44aa7a4a16")
