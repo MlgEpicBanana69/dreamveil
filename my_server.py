@@ -62,6 +62,10 @@ class Server:
         self.closed = True
 
 class Connection:
+    COMMAND_SIZE = 6
+    HEADER_LEN = len(str(dreamveil.Block.MAX_BLOCK_SIZE))
+    MAX_MESSAGE_SIZE = HEADER_LEN + COMMAND_SIZE + dreamveil.Block.MAX_BLOCK_SIZE
+
     def __init__(self, socket, address):
         self.socket = socket
         self.address = address
@@ -80,11 +84,14 @@ class Connection:
         del Server.singleton.peers[self.address]
 
     def send(self, message:str):
+        assert len(message) <= Connection.MAX_MESSAGE_SIZE
+
         # Halt sending messages until the connection setup is made
         while not self.setup and not self.closed:
             pass
 
         if not self.closed:
+            message = str(len(message)).zfill(Connection.HEADER_LEN) + message
             self.socket.send(message.encode())
         else:
             raise Exception("Cannot send message. Connection is already closed.")
@@ -93,10 +100,41 @@ class Connection:
         self.conversation_setup()
         try:
             while not self.closed:
-                message = self.socket.recv(dreamveil.Block.MAX_BLOCK_SIZE)
-                print(message)
+                try:
+                    message = self.socket.recv(Connection.HEADER_LEN + Connection.COMMAND_SIZE + dreamveil.Block.MAX_BLOCK_SIZE)
+                    if len(message) >= Connection.HEADER_LEN + Connection.COMMAND_SIZE:
+                        commands = self.parse_messages(message.decode())
+                        for command in commands:
+                            self.parse_command(command)
+                    else:
+                        print(f"### Recieved invalid message (too small in size): {message.decode()}")
+                except:
+                    print(f"!!! Internal server error at Connection({Connection.address}). (last message: {message})")
         except (ConnectionResetError):
             self.close()
+
+    def parse_messages(message:str):
+        output = []
+        scanned_count = 0
+        while scanned_count < len(message):
+            command_len = message[scanned_count:scanned_count + Connection.HEADER_LEN]
+            try:
+                command_len = command_len.lstrip("0")
+                command_len = int(command_len)
+            except ValueError:
+                print(f"### Recieved invalid message (Wrongly formatted): {message}")
+                break
+            scanned_count += Connection.HEADER_LEN
+            command = message[scanned_count:Connection.COMMAND_SIZE]
+            scanned_count += Connection.COMMAND_SIZE
+            command_message = message[scanned_count: scanned_count + command_len]
+            scanned_count += command_len
+            output.append((command, command_message))
+        return output
+
+    def parse_command(self, command_message:bytes):
+        pass
+
 
     def conversation_setup(self):
         self.socket.send(Server.singleton.version.encode())
