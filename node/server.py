@@ -1,7 +1,10 @@
+import ipaddress
 import dreamveil
 
 import socket
 import threading
+
+from node.dreamveil import Transaction
 
 class Server:
     singleton = None
@@ -12,7 +15,7 @@ class Server:
 
         Server.singleton = self
         self.version = version
-        self.events = events
+        self.events = dict(zip([event.__name__ for event in events], events))
         self.address = address
         self.port = port
         self.max_peer_amount = max_peer_amount
@@ -140,9 +143,23 @@ class Connection:
 
     def parse_command(self, command:str, param):
         try:
-            for event in Server.singleton.events:
-                if event.__name__ == command:
-                    event(param)
+            match command:
+                case "SENDTX":
+                    param = str(param)
+                case "YELLBK":
+                    param = int(param)
+                case "GIVEBK":
+                    param = int(param)
+                case "FRIEND":
+                    param = str(param).split(',')
+                    for peer_addr in param:
+                        assert ipaddress.ip_address(peer_addr)
+                case "LONELY":
+                    param = str(param)
+                    assert ipaddress.ip_address(peer_addr)
+                case _:
+                    raise ValueError("Unknown command")
+            Server.singleton.events[self.address, command](param)
             return True
         except (AssertionError, ValueError) as command_err:
             print(f"!!! Could not parse command {command} from {self.address}")
