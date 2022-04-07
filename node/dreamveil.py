@@ -8,7 +8,6 @@ import copy
 
 import data_structures
 
-
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
@@ -217,14 +216,6 @@ class Block:
         information = [self.previous_block_hash, self.height, self.transactions, self.nonce, self.block_hash]
         return repr(information)
 
-    def do_blocks_chain(self, antecedent_block):
-        """Checks if antecedent_block << self is a valid chain"""
-        if antecedent_block.signature != self.previous_block_hash:
-            return False
-        if antecedent_block.height != self.height+1:
-            return False
-        return True
-
     def verify_block_has_reward(self):
         """Checks that the block has one miner reward transaction and only one.
 
@@ -246,7 +237,6 @@ class Block:
 
 class Blockchain:
     TRUST_HEIGHT = 10
-    # WALLET_RECORD_TEMPLATE = {"crt": [], "gnd": []}
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
     BLOCK_REWARD_SEASON = (0.5*365*24*60*60/AVERAGE_TIME_PER_BLOCK) # 52560
     BLOCK_INITIAL_REWARD = 727
@@ -254,83 +244,45 @@ class Blockchain:
 
     # Transaction record tree
     # Transaction signature: (spent, value)
-    def __init__(self, chain=[], untrusted_timeline=None, unspent_transactions_tree=None):
+    def __init__(self, chain,  unspent_transactions_tree):
         self.chain = chain
-        self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
-        if untrusted_timeline is not None:
-            self.untrusted_timeline = untrusted_timeline
-        else:
-            self.untrusted_timeline = data_structures.multifurcasting_tree()
-            self.untrusted_timeline.insert(chain[-1], None)
+        self.unspent_transactions_tree = unspent_transactions_tree
 
     def chain_block(self, block:Block):
         """Tries to chain a block to the blockchain. This function succeeds only if a block is valid.
         Valid blocks first move into the untrusted timeline.
         The block is chained to the blockchain once it reaches TRUST_HEIGHT in the untrusted timeline
-        On success returns True. Returns False otherwise"""
+        :returns: Did block chain (boolean)"""
 
 
         if len(self.chain) > 0:
-            if not self.add_block_to_untrusted_timeline(self.untrusted_timeline, block):
-                # Block is unrelated to the main chain
+            if block.height != self.chain[-1].height + 1:
+                return False
+            elif block.previous_block_hash != self.chain[-1].block_hash:
+                # Block does not directly chain
                 # TODO: Check/show that block(x+1) cannot practically arrive before block(x)
                 return False
 
-        if self.untrusted_timeline.calculate_height() == Blockchain.TRUST_HEIGHT+1 or len(self.chain) == 0:
-            if not self.verify_block(block):
-                return False
+        if not self.verify_block(block):
+            return False
 
-            # Untrusted block has a TRUST_HEIGHT timeline
-            # Block is chained into the blockchain since it can now be trusted
-            newly_trusted_block_node = self.untrusted_timeline.get_highest_child()
-            self.chain.append(newly_trusted_block_node.value)
-            # Remove the now trusted block from the timeline and advance on its timeline
-            self.untrusted_timeline = newly_trusted_block_node
+        # Add the newly accepted block into the blockchain
+        self.chain.append(block)
 
-            # For each now accepted transaction in the newly trusted block
-            for transaction in self.chain[-1].transaction:
-                # Mark the transaction as unspent
-                data_structures.binary_tree_node(transaction.signature, dict(zip(transaction.outputs.keys(), len(transaction.outputs)*[True])))
+        # For each now accepted transaction in the newly trusted block
+        for transaction in self.chain[-1].transaction:
+            # Mark the transaction as unspent
+            data_structures.binary_tree_node(transaction.signature, transaction.outputs)
 
-                # For each input the new transaction referenced
-                for heavenly_principle_struck_transaction in transaction.inputs: # All is lost to time (and use) (?)
-                    # Find the node that stores the status of the input-referenced transaction
-                    intree_node = self.unspent_transactions_tree.find(self.unspent_transactions_tree.tree, heavenly_principle_struck_transaction)
-                    try:
-                        # TODO: DEBUG
-                        # An extra precaution check
-                        # This flag should will and must be True and pass.
-                        assert intree_node[transaction.sender]
-                    except AssertionError:
-                        # This error should never trigger as the object checks for the validity of a transaction beforehand.
-                        # (should've not passed Blockchain.verify_block())
-                        print("Error catching double-spending attempt!!!")
-                        raise
-                    intree_node[transaction.sender] = False # We set the transaction's output to spent (Transaction output was used)
+            # For each input the new transaction referenced
+            for heavenly_principle_struck_transaction in transaction.inputs: # All is lost to time (and use) (?)
+                # Find the node that stores the status of the input-referenced transaction
+                intree_node = self.unspent_transactions_tree.find(self.unspent_transactions_tree.tree, heavenly_principle_struck_transaction)
 
-        # Block was accepted but is not trusted yet (Added to the untrusted timeline)!
-        return None
+                # We remove the transaction's output as it was spent
+                del intree_node[transaction.sender]
 
-    def _insert_block_to_multifurcasting_tree(self, block, root):
-        if root is None:
-            root = self.untrusted_timeline.tree
-
-        # The block was already inserted into the timeline
-        if root.value.block_hash == block.block_hash:
-            return None
-
-        if root.value.block_hash == block.previous_block_hash:
-            root.children.append(block)
-            return root
-
-        for child in root.children:
-            result = self._insert_block_to_multifurcasting_tree(block, child)
-            if result is not None:
-                break
-        return result
-
-    def add_block_to_untrusted_timeline(self, block):
-        return self._insert_block_to_multifurcasting_tree(self, block, self.untrusted_timeline)
+        return True
 
     def verify_block(self, block):
         """
@@ -343,17 +295,17 @@ class Blockchain:
         # For each transaction in the block
         for transaction in block.transactions:
             # Go over all of the inputs referenced in the block.
-            for transaction_input in transaction.inputs.keys():
-                if transaction_input != "BLOCK":
-                    transaction_node = self.untrusted_timeline.find(self.untrusted_timeline.tree, transaction_input)
-                    if transaction_input is None:
+            for input_source, input_amount in transaction.inputs.items():
+                if input_source != "BLOCK":
+                    transaction_node = self.unspent_transactions_tree.find(self.unspent_transactions_tree.tree, input_source)
+                    if input_source is None:
                         print("Block rejected in verify_block (referenced transaction does not exist)")
                         return False
                     if transaction.sender not in transaction_node.value.keys():
-                        print("Block rejected in verify_block (referenced transaction exists but the output does not)")
+                        print("Block rejected in verify_block (output was already spent or is invalid)")
                         return False
-                    if transaction_node.value[transaction.sender] != True:
-                        print("Block rejected in verify_block (given output was already spent.)")
+                    if transaction_node.value[transaction.sender] != input_amount:
+                        print("Block rejected in verify_block (output amount is not the same as specified in the transaction)")
                         return False
                 else:
                     miner_reward_transaction = transaction
@@ -368,8 +320,7 @@ class Blockchain:
         return True
 
     def dumps(self):
-        # TODO Make blockchain dumps and loads
-        information = [self.chain, self.untrusted_timeline.dumps(), self.unspent_transactions_tree.dumps()]
+        information = [self.chain, self.unspent_transactions_tree.dumps()]
         return repr(information)
 
     @staticmethod
@@ -397,8 +348,6 @@ class Blockchain:
         for transaction in block_reward.transactions:
             block_reward += transaction.miner_fee
         return Decimal(block_reward)
-
-GENESIS_BLOCK = Block("a76b338874117acd5c4151e0f532cb7bd4d84764d818a52d61acdb44aa7a4a16", 0, [Transaction("", 0, {"BLOCK": Blockchain.BLOCK_INITIAL_REWARD}, {"", Blockchain.BLOCK_INITIAL_REWARD}, "", "")], 0, "a76b338874117acd5c4151e0f532cb7bd4d84764d818a52d61acdb44aa7a4a16")
 
 # debugging
 if __name__ == '__main__':
