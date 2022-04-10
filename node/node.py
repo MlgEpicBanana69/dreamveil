@@ -258,6 +258,11 @@ class Connection:
             return False
 
 def load_state():
+    if not os.path.isdir(APPLICATION_PATH + "state"):
+        os.mkdir(APPLICATION_PATH + "state")
+    if not os.path.isdir(APPLICATION_PATH + "state\\backup"):
+        os.mkdir(APPLICATION_PATH + "state\\backup")
+
     read_param = "r+" if os.path.isfile(APPLICATION_PATH + "state\\blockchain.json") else "w+"
     with open(APPLICATION_PATH + "state\\blockchain.json", read_param) as f:
         try:
