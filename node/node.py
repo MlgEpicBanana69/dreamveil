@@ -98,8 +98,11 @@ class Server:
             # Do not accept new connections once peer count exceeds maximum allowed
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
-                self.peers[peer_address] = Connection(peer_socket, peer_address)
-                print(f"### {peer_address} connected to node")
+                if peer_address not in self.peers.keys():
+                    self.peers[peer_address] = Connection(peer_socket, peer_address)
+                    print(f"### {peer_address} connected to node")
+                else:
+                    peer_socket.close()
 
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount:
@@ -158,7 +161,7 @@ class Connection:
                     else:
                         print(f"### Recieved invalid message (too small in size): {message.decode()}")
                 except:
-                    print(f"!!! Internal server error at Connection({Connection.address}). (last message: {message})")
+                    print(f"!!! Internal server error at Connection({self.address}). (last message: {message})")
         except (ConnectionResetError):
             self.close()
 
@@ -309,4 +312,4 @@ server = Server(VERSION, peer_pool, application_config["SERVER"]["address"])
 
 while True:
     time.sleep(10)
-    print("Yes the thread does work bruh moment")
+    #print("Yes the thread does work bruh moment")
