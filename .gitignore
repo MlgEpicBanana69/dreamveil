@@ -13,7 +13,6 @@ __pycache__/
 # enviornmental files
 backup/
 state/
-node.cfg
 
 
 # Distribution / packaging
