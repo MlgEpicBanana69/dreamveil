@@ -69,6 +69,7 @@ class Server:
            time.sleep(60)
 
     def seeker(self):
+        time.sleep(5)
         print(f"Server is now seeking new connections")
 
         while not self.closed:
@@ -104,7 +105,6 @@ class Server:
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
             try:
-                self.peers[address] = None
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
                 new_peer = Connection(peer_socket, address)
@@ -218,7 +218,7 @@ class Connection:
                 self.working = None
                 return output
             except Exception as err:
-                print(f"Connection with {self.address} forcibly closed due to failure {err}")
+                print(f"!!! Connection with {self.address} forcibly closed due to failure {err}")
                 self.close()
         return wrapper
 
