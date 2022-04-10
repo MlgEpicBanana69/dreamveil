@@ -11,6 +11,10 @@ __pycache__/
 *.vscode
 
 # enviornmental files
+backup/
+state/*.json
+node.cfg
+
 
 # Distribution / packaging
 .Python
