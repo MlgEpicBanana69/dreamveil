@@ -160,8 +160,9 @@ class Connection:
                             self.parse_command(command, param)
                     else:
                         print(f"### Recieved invalid message (too small in size): {message.decode()}")
-                except:
-                    print(f"!!! Internal server error at Connection({self.address}). (last message: {message})")
+                except Exception as err:
+                    print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
+                    self.close()
         except (ConnectionResetError):
             self.close()
 
