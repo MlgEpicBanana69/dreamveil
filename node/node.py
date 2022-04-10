@@ -69,15 +69,13 @@ class Server:
            time.sleep(60)
 
     def seeker(self):
-        print(f"Server is now seeking new connections\n============================================")
+        print(f"Server is now seeking new connections")
 
         while not self.closed:
             # Once connection amount is too low, seek connections if possible.
             while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
                 new_peer = self.roll_peer()
-                if new_peer is None:
-                    break
-                else:
+                if new_peer is not None:
                     connection_result = self.connect(new_peer)
                     if connection_result is None:
                         # TODO: Define peer status system
@@ -91,8 +89,7 @@ class Server:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.address, self.port))
         self.socket.listen(self.max_peer_amount)
-
-        print(f"Server is now accepting incoming connections and is binded to {(self.address, self.port)}\n============================================")
+        print(f"Server is now accepting incoming connections and is binded to {(self.address, self.port)}")
 
         while not self.closed:
             # Do not accept new connections once peer count exceeds maximum allowed
@@ -105,20 +102,24 @@ class Server:
                     peer_socket.close()
 
     def connect(self, address):
-        if len(self.peers) <= self.max_peer_amount:
+        if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
             try:
+                self.peers[address] = new_peer
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
                 new_peer = Connection(peer_socket, address)
-                self.peers[address] = new_peer
                 print(f"### Server connected to {address}")
                 return new_peer
             except TimeoutError:
                 print(f"!!! Failed to connect to {address}")
+                del self.peers[address]
                 return None
         else:
             print(f"!!! Failed to connect to {address}")
-            print(f"### Server rules do not allow making more than {self.max_peer_amount} connections.")
+            if len(self.peers) <= self.max_peer_amount:
+                print(f"### Server rules do not allow making more than {self.max_peer_amount} connections.")
+            else:
+                print(f"### Cannot form two connections to the same address {self.address}")
             return None
 
     def close(self):
@@ -130,6 +131,7 @@ class Server:
         self.closed = True
 
     def broadcast(self, message, exclusions=[]):
+        #TODO: Check if this is needed anymore
         for peer_addr, peer in self.peers.items():
             if peer_addr not in exclusions:
                 peer.send(message)
