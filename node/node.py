@@ -104,10 +104,11 @@ class Server:
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
             try:
-                self.peers[address] = new_peer
+                self.peers[address] = None
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
                 new_peer = Connection(peer_socket, address)
+                self.peers[address] = new_peer
                 print(f"### Server connected to {address}")
                 return new_peer
             except TimeoutError:
