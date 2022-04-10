@@ -10,6 +10,8 @@ __pycache__/
 *.vs
 *.vscode
 
+# enviornmental files
+
 # Distribution / packaging
 .Python
 build/
