@@ -69,7 +69,7 @@ class Server:
            time.sleep(60)
 
     def seeker(self):
-        time.sleep(5)
+        time.sleep(1)
         print(f"Server is now seeking new connections")
 
         while not self.closed:
