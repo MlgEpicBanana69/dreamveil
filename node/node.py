@@ -146,7 +146,7 @@ class Connection:
         self.thread.start()
 
     def run(self):
-        self.conversation_setup()
+        self.setup()
         try:
             while not self.closed:
                 try:
@@ -199,8 +199,8 @@ class Connection:
         return output
 
     #region connection commands
-    def connection_command(self):
-        def wrapper(*args, **kwargs):
+    def connection_command(command_func):
+        def wrapper(self, *args, **kwargs):
             # Halt sending commands until the previous command has finished
             while self.working is not None and not self.closed:
                 pass
