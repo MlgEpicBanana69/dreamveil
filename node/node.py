@@ -206,7 +206,7 @@ class Connection:
                 pass
 
             self.working = command_func.__name__
-            output = command_func(*args, **kwargs)
+            output = command_func(self, *args, **kwargs)
             self.working = None
             return output
         return wrapper
@@ -307,5 +307,6 @@ print("Finished loading state")
 
 server = Server(VERSION, peer_pool, application_config["SERVER"]["address"])
 
-for p in server.peers.values():
-    p.send("hello")
+while True:
+    time.sleep(10)
+    print("Yes the thread does work bruh moment")
