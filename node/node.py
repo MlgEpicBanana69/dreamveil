@@ -98,8 +98,8 @@ class Server:
             # Do not accept new connections once peer count exceeds maximum allowed
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
-                if peer_address not in self.peers.keys():
-                    self.peers[peer_address] = Connection(peer_socket, peer_address)
+                if peer_address[0] not in self.peers.keys():
+                    self.peers[peer_address[0]] = Connection(peer_socket, peer_address)
                     print(f"### {peer_address} connected to node")
                 else:
                     peer_socket.close()
@@ -205,14 +205,18 @@ class Connection:
     #region connection commands
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
-            # Halt sending commands until the previous command has finished
-            while self.working is not None and not self.closed:
-                pass
+            try:
+                # Halt sending commands until the previous command has finished
+                while self.working is not None and not self.closed:
+                    pass
 
-            self.working = command_func.__name__
-            output = command_func(self, *args, **kwargs)
-            self.working = None
-            return output
+                self.working = command_func.__name__
+                output = command_func(self, *args, **kwargs)
+                self.working = None
+                return output
+            except Exception as err:
+                print(f"Connection with {self.address} forcibly closed due to failure {err}")
+                self.close()
         return wrapper
 
     @connection_command
