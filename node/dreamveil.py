@@ -244,16 +244,15 @@ class Blockchain:
 
     # Transaction record tree
     # Transaction signature: (spent, value)
-    def __init__(self, chain,  unspent_transactions_tree):
+    def __init__(self, chain=[], unspent_transactions_tree=None):
         self.chain = chain
-        self.unspent_transactions_tree = unspent_transactions_tree
+        self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
 
     def chain_block(self, block:Block):
         """Tries to chain a block to the blockchain. This function succeeds only if a block is valid.
         Valid blocks first move into the untrusted timeline.
         The block is chained to the blockchain once it reaches TRUST_HEIGHT in the untrusted timeline
         :returns: Did block chain (boolean)"""
-
 
         if len(self.chain) > 0:
             if block.height != self.chain[-1].height + 1:

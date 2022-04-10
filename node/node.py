@@ -7,12 +7,13 @@ import secrets
 import json
 import random
 import math
+import time
 
 
 import socket
 import threading
 
-from node.dreamveil import Block, Transaction
+APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
 class Server:
     singleton = None
@@ -32,8 +33,11 @@ class Server:
         self.seeked_peer_addrs = set()
         self.peer_pool = peer_pool
         self.closed = False
-
-        self.run()
+        self.seeker_thread = threading.Thread(target=self.seeker)
+        self.accepter_thread = threading.Thread(target=self.accepter)
+        self.run_thread = threading.Thread(target=self.run)
+        
+        self.run_thread.start()
 
     def roll_peer(self):
         peer_options = []
@@ -44,39 +48,42 @@ class Server:
             elif status == "DEPRECATED" and peer not in self.peers.keys():
                 deprecated_peer_options.append(peer)
         if len(peer_options) > 0:
-            return random.choice(peer_options)
+            output = random.choice(peer_options)
+            print(f"### Rolled {output} from peer options")
+            return output
         elif len(deprecated_peer_options) > 0:
-            return random.choice(deprecated_peer_options)
+            output = random.choice(deprecated_peer_options)
+            return output
         else:
-            print("!!! In roll_peer no suitable peer was found!")
             return None
 
     def run(self):
-       self.seeker_thread = threading.Thread(target=self.seeker)
-       self.accepter_thread = threading.Thread(target=self.accepter)
-       print("Starting server and assigning seeker and accepter threads")
-       print("_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-")
-       self.seeker_thread.run()
-       self.accepter_thread.run()
+        print("Starting server and assigning seeker and accepter threads")
+        print("-----------------------------------------------------------")
+        self.accepter_thread.start()
+        self.seeker_thread.start()
+
+        print("Server is now running...")
+        while True:
+           print(f"### {len(self.peers)}/{self.max_peer_amount} connected. Current peer pool size: {len(self.peer_pool)}")
+           time.sleep(60)
 
     def seeker(self):
-        print(f"Server is now seeking new connections")
-        print("============================================")
+        print(f"Server is now seeking new connections\n============================================")
 
         while not self.closed:
             # Once connection amount is too low, seek connections if possible.
             while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
                 new_peer = self.roll_peer()
                 if new_peer is None:
-                    print("!!! Failed to find new peer in Server.run()!")
-                    peer_pool
                     break
                 else:
                     connection_result = self.connect(new_peer)
                     if connection_result is None:
                         # TODO: Define peer status system
-                        peer_pool[new_peer] = "DEPRECATED"
-                        print(f"### Marked {new_peer} as DEPRECATED")
+                        if peer_pool[new_peer] != "DEPRECATED":
+                            peer_pool[new_peer] = "DEPRECATED"
+                            print(f"### Marked {new_peer} as DEPRECATED")
                     else:
                         peer_pool[new_peer] = "CONVERSED"
 
@@ -85,8 +92,7 @@ class Server:
         self.socket.bind((self.address, self.port))
         self.socket.listen(self.max_peer_amount)
 
-        print(f"Server is now accepting incoming connections and is binded to {(self.address, self.port)}")
-        print("============================================")
+        print(f"Server is now accepting incoming connections and is binded to {(self.address, self.port)}\n============================================")
 
         while not self.closed:
             # Do not accept new connections once peer count exceeds maximum allowed
@@ -193,7 +199,7 @@ class Connection:
         return output
 
     #region connection commands
-    def connection_command(self, command_func):
+    def connection_command(self):
         def wrapper(*args, **kwargs):
             # Halt sending commands until the previous command has finished
             while self.working is not None and not self.closed:
@@ -217,11 +223,11 @@ class Connection:
             print(f"### Connection with {self.address} completed setup (version: {Server.singleton.version})")
 
     @connection_command
-    def SENDTX(self, transaction:Transaction):
+    def SENDTX(self, transaction:dreamveil.Transaction):
         pass
 
     @connection_command
-    def SENDBK(self, block:Block):
+    def SENDBK(self, block:dreamveil.Block):
         pass
     #endregion
 
@@ -252,7 +258,7 @@ class Connection:
             return False
 
 def load_state():
-    with open("state\\blockchain.json", "w+") as f:
+    with open(APPLICATION_PATH + "state\\blockchain.json", "r+") as f:
         try:
             contents = f.read()
             if contents == "":
@@ -262,9 +268,12 @@ def load_state():
         except (ValueError, AssertionError) as err:
             print("!!! Could not loads blockchain from state")
             print(err)
-            if os.path.isfile("state\\blockchain.json"):
-                os.rename("state\\blockchain.json", f"state\\backup\\blockchain{secrets.token_hex(8)}.json.old")
-    with open("state\\peer_pool.json", "w+") as f:
+
+            f.close()
+            if os.path.isfile(APPLICATION_PATH + "state\\blockchain.json"):
+                os.rename(APPLICATION_PATH + "state\\blockchain.json", APPLICATION_PATH + f"state\\backup\\blockchain-{secrets.token_hex(8)}.json.old")
+
+    with open(APPLICATION_PATH + "state\\peer_pool.json", "r+") as f:
         try:
             contents = f.read()
             if contents == "":
@@ -275,13 +284,14 @@ def load_state():
         except (ValueError, AssertionError) as err:
             print("!!! Could not loads peer pool from state")
             print(err)
+            f.close()
             if os.path.isfile("state\\peer_pool.json"):
-                os.rename("state\\peer_pool.json", f"state\\backup\\peer_pool{secrets.token_hex(8)}.json.old")
+                os.rename("state\\peer_pool.json", f"state\\backup\\peer_pool-{secrets.token_hex(8)}.json.old")
 
     return blockchain, peer_pool
 
 application_config = configparser.ConfigParser()
-application_config.read("node.cfg")
+application_config.read(APPLICATION_PATH + "node.cfg")
 VERSION = application_config["METADATA"]["version"]
 
 print("Loading state from saved files...")
