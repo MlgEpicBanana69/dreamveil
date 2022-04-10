@@ -12,7 +12,7 @@ __pycache__/
 
 # enviornmental files
 backup/
-state/*.json
+state/
 node.cfg
 
 
