@@ -258,7 +258,8 @@ class Connection:
             return False
 
 def load_state():
-    with open(APPLICATION_PATH + "state\\blockchain.json", "r+") as f:
+    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "state\\blockchain.json") else "w+"
+    with open(APPLICATION_PATH + "state\\blockchain.json", read_param) as f:
         try:
             contents = f.read()
             if contents == "":
@@ -273,7 +274,8 @@ def load_state():
             if os.path.isfile(APPLICATION_PATH + "state\\blockchain.json"):
                 os.rename(APPLICATION_PATH + "state\\blockchain.json", APPLICATION_PATH + f"state\\backup\\blockchain-{secrets.token_hex(8)}.json.old")
 
-    with open(APPLICATION_PATH + "state\\peer_pool.json", "r+") as f:
+    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "state\\peer_pool.json") else "w+"
+    with open(APPLICATION_PATH + "state\\peer_pool.json", read_param) as f:
         try:
             contents = f.read()
             if contents == "":
