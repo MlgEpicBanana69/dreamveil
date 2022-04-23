@@ -235,6 +235,13 @@ class Block:
         """Returns a short str containing the descriptive variables of the block seperated by space. Used for identification."""
         return f"{self.previous_block_hash} {self.block_hash}"
 
+    def mine(self, difficulty_target:int):
+        """Tries to find a block solution by repeated guessing"""
+        while True:
+            if self.block_hash[:difficulty_target] == "0"*difficulty_target:
+                return self.block_hash
+            self.nonce += 1
+            self.hash_block()
 class Blockchain:
     TRUST_HEIGHT = 6
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
