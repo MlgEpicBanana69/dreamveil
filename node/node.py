@@ -1,5 +1,6 @@
 from itertools import chain
 from attr import has
+from cv2 import split
 import dreamveil
 
 import configparser
@@ -149,7 +150,7 @@ class Connection:
         self.closed = False
         self.working = None
         self.run_recieving = False
-        self.peer_chain_size = None
+        self.peer_chain_len = None
         self.peer_top_block_hash = None
 
         self.thread = threading.Thread(target=self.run)
@@ -274,14 +275,21 @@ class Connection:
         # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
         my_chain_len = len(Server.singleton.blockchain.chain)
         self.send(my_chain_len)
+        peer_chain_len, peer_top_block_hash = self.recv().split(' ')
+        peer_chain_len = int(peer_chain_len)
+        self.peer_chain_len = peer_chain_len
+        self.peer_top_block_hash = peer_top_block_hash
+        if peer_chain_len < my_chain_len + dreamveil.Blockchain.TRUST_HEIGHT:
+            self.send("False")
+            return
+        self.send("True")
         hashes = []
         inventory = []
         split_index = 0
-        #TODO: IF all hashes are the same (no split) aka same chian then don't create new object just chain to main object
         while True:
             hashes = self.recv().split(' ')
             #TODO: DEBUG splicing
-            for i in range((my_chain_len - len(inventory))-len(hashes), (my_chain_len - len(inventory)))[::-1]:
+            for i in range(my_chain_len - len(inventory) - len(hashes), my_chain_len - len(inventory))[::-1]:
                 if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
                     split_index = i+1
                     hashes = []
@@ -292,28 +300,35 @@ class Connection:
                 self.send("continue")
             else:
                 break
-
+        form_new_chain = len(inventory) > 0
         # Create the new blockchain object and fill in the known blocks
         inventory = inventory[::-1]
-        new_blockchain = dreamveil.Blockchain()
-        for i in range(split_index):
-            new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
+        if form_new_chain:
+            new_blockchain = dreamveil.Blockchain()
+            for i in range(split_index):
+                new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
         self.send(str(split_index))
 
         # Download all the blocks mentioned in the inventory list from the peer
-        for bk_hash in inventory:
+        for i in range(peer_chain_len - my_chain_len + len(inventory)):
             new_bk = dreamveil.Block.loads(self.recv())
-            chain_result = new_blockchain.chain(new_bk)
-            if new_bk.hash_block != bk_hash or not chain_result:
-                print(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain or has an unmatched hash. {new_bk.hash_block}, {bk_hash}")
-                del new_blockchain
+            if form_new_chain:
+                chain_result = new_blockchain.chain(new_bk)
+            else:
+                chain_result = Server.singleton.blockchain.chain(new_bk)
+            if not chain_result:
+                print(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
+                if form_new_chain:
+                    del new_blockchain
                 self.close()
                 return
-        # If the given blockchain is indeed larger than the current blockchain used
-        if len(new_blockchain.chain) > len(Server.singleton.blockchain.chain):
-            # We swap the blockchain objects to the new larger one.
-            Server.singleton.blockchain = new_blockchain
-    #endregion
+            self.send("continue")
+        if form_new_chain:
+            # If the given blockchain is indeed larger than the current blockchain used
+            if len(new_blockchain.chain) > len(Server.singleton.blockchain.chain):
+                # We swap the blockchain objects to the new larger one.
+                Server.singleton.blockchain = new_blockchain
+        print(f"### With ({self.address}) finished syncing new chain at length {Server.singleton.blockchain.chain} (old: {my_chain_len})")    #endregion
 
     @connection_command
     def parse_command(self, command:str, param:str):
@@ -350,7 +365,26 @@ class Connection:
                 case "CHNTOP":
                     param = int(param)
                 case "CHNSYN":
-                    param = int(param)
+                    peer_chain_len, peer_top_block_hash = self.recv().split(' ')
+                    peer_chain_len = int(peer_chain_len)
+                    self.peer_chain_len = peer_chain_len
+                    self.peer_top_block_hash = peer_top_block_hash
+                    if self.recv() == "True":
+                        hash_batches_sent = 0
+                        while True:
+                            hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[:peer_chain_len:][::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
+                            self.send(" ".join(hash_batch))
+                            split_index = self.recv()
+                            if split_index != "continue":
+                                break
+                        split_index = int(split_index)
+                        assert split_index >= 0 and split_index < len(Server.singleton.blockchain.chain)
+                        blocks_sent = 0
+                        for block in Server.singleton.blockchain.chain[split_index::]:
+                            self.send(block.dumps())
+                            blocks_sent+=1
+                            self.recv()
+                        print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
                 case "FRIEND":
                     param = str(param).split(',')
                     for peer_addr in param:

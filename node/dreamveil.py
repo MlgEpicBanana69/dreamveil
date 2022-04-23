@@ -236,7 +236,7 @@ class Block:
         return f"{self.previous_block_hash} {self.block_hash}"
 
 class Blockchain:
-    TRUST_HEIGHT = 10
+    TRUST_HEIGHT = 6
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
     BLOCK_REWARD_SEASON = (0.5*365*24*60*60/AVERAGE_TIME_PER_BLOCK) # 52560
     BLOCK_INITIAL_REWARD = 727
