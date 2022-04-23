@@ -134,11 +134,10 @@ class Transaction:
 class Block:
     MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
-    def __init__(self, previous_block_hash:str, height:int, transactions:list, nonce:int = 0, block_hash:str = ""):
-        assert type(previous_block_hash) == str and type(height) == int and type(transactions) == list and type(nonce) == int and type(block_hash) == str
+    def __init__(self, previous_block_hash:str, transactions:list, nonce:int = 0, block_hash:str = ""):
+        assert type(previous_block_hash) == str and type(transactions) == list and type(nonce) == int and type(block_hash) == str
 
         self.previous_block_hash = previous_block_hash
-        self.height = height
         self.transactions = transactions
         self.nonce = nonce
         self.block_hash = block_hash
@@ -155,7 +154,7 @@ class Block:
         self.transactions.remove(transaction)
 
     def get_contents(self):
-        information = [self.previous_block_hash, self.height, self.transactions, self.nonce]
+        information = [self.previous_block_hash, self.transactions, self.nonce]
         return repr(information)
 
     def hash_block(self):
@@ -169,18 +168,15 @@ class Block:
             assert len(json_str.encode()) <= Block.MAX_BLOCK_SIZE
             information = json.loads(json_str)
             assert type(information) == list
-            assert len(information) == 5
+            assert len(information) == 4
             assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
-            # Block height
-            assert information[1] >= 0
 
-            #      information[2]
-            # region verify transactions
+            #region information[1]
             # Read and interpret each transaction object seperately
-            assert len(information[2]) > 0 and type(information[2]) == list
+            assert len(information[1]) > 0 and type(information[1]) == list
             transactions = []
             # TODO: Debug this bs
-            for transaction in information[2]:
+            for transaction in information[1]:
                 transactions.append(Transaction.loads(transaction))
 
             # Verifies that there are no duplicate transactions
@@ -196,13 +192,13 @@ class Block:
                     assert decayed_output not in decayed_outputs
                     decayed_outputs.append(decayed_output)
 
-            information[2] = transactions
+            information[1] = transactions
             #endregion
 
             # Nonce
-            assert information[3] >= 0
+            assert information[2] >= 0
 
-            assert type(information[4]) == str and len(information[4]) == 64 and int(information[4], base=16)
+            assert type(information[3]) == str and len(information[3]) == 64 and int(information[3], base=16)
             output = Block(*information)
             assert output.verify_hash()
             assert output.verify_block_has_reward()
@@ -213,7 +209,7 @@ class Block:
             raise err
 
     def dumps(self):
-        information = [self.previous_block_hash, self.height, self.transactions, self.nonce, self.block_hash]
+        information = [self.previous_block_hash, self.transactions, self.nonce, self.block_hash]
         return repr(information)
 
     def verify_block_has_reward(self):
@@ -235,6 +231,10 @@ class Block:
         self.block_hash = proposed_hash
         return output
 
+    def get_header(self):
+        """Returns a short str containing the descriptive variables of the block seperated by space. Used for identification."""
+        return f"{self.previous_block_hash} {self.block_hash}"
+
 class Blockchain:
     TRUST_HEIGHT = 10
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
@@ -249,20 +249,16 @@ class Blockchain:
         self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
 
     def chain_block(self, block:Block):
-        """Tries to chain a block to the blockchain. This function succeeds only if a block is valid.
-        Valid blocks first move into the untrusted timeline.
-        The block is chained to the blockchain once it reaches TRUST_HEIGHT in the untrusted timeline
+        """Chains a block to the blockchain. This function succeeds only if a block is valid.
         :returns: Did block chain (boolean)"""
 
         if len(self.chain) > 0:
-            if block.height != self.chain[-1].height + 1:
-                return False
-            elif block.previous_block_hash != self.chain[-1].block_hash:
+            if block.previous_block_hash != self.chain[-1].block_hash:
                 # Block does not directly chain
                 # TODO: Check/show that block(x+1) cannot practically arrive before block(x)
                 return False
 
-        if not self.verify_block(block):
+        if not self.verify_block(block, len(self.chain)):
             return False
 
         # Add the newly accepted block into the blockchain
@@ -283,7 +279,7 @@ class Blockchain:
 
         return True
 
-    def verify_block(self, block):
+    def verify_block(self, block, block_height):
         """
         This function verifies that the sender of each transaction in the block has the resources to carry it out.
         Transactions do not recognize other transactions in the same block to prevent order frauding
@@ -313,7 +309,7 @@ class Blockchain:
         proposed_block_reward = Decimal(0)
         for output in miner_reward_transaction.outputs.values():
             proposed_block_reward += Decimal(output)
-        if proposed_block_reward != Blockchain.calculate_block_reward(block.height) + block_fees:
+        if proposed_block_reward != Blockchain.calculate_block_reward(block_height) + block_fees:
             print("Block rejected in verify_block (Miner transaction does not evaluate to the correct amount)")
             return False
         return True
