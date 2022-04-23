@@ -1,3 +1,5 @@
+from itertools import chain
+from attr import has
 import dreamveil
 
 import configparser
@@ -18,7 +20,7 @@ APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 class Server:
     singleton = None
 
-    def __init__(self, version:str, peer_pool:dict, address:str, port=22727, max_peer_amount=150):
+    def __init__(self, version:str, blockchain:dreamveil.Blockchain, peer_pool:dict, address:str, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -28,15 +30,14 @@ class Server:
         self.port = port
         self.max_peer_amount = max_peer_amount
         self.socket = None
+        self.blockchain = blockchain
         self.peers = {}
-        self.accepted_peer_addrs = set()
-        self.seeked_peer_addrs = set()
         self.peer_pool = peer_pool
         self.closed = False
         self.seeker_thread = threading.Thread(target=self.seeker)
         self.accepter_thread = threading.Thread(target=self.accepter)
         self.run_thread = threading.Thread(target=self.run)
-        
+
         self.run_thread.start()
 
     def roll_peer(self):
@@ -69,7 +70,7 @@ class Server:
            time.sleep(60)
 
     def seeker(self):
-        time.sleep(1)
+        time.sleep(5)
         print(f"Server is now seeking new connections")
 
         while not self.closed:
@@ -140,13 +141,16 @@ class Server:
 class Connection:
     COMMAND_SIZE = 6
     HEADER_LEN = len(str(dreamveil.Block.MAX_BLOCK_SIZE))
-    MAX_MESSAGE_SIZE = HEADER_LEN + COMMAND_SIZE + dreamveil.Block.MAX_BLOCK_SIZE
+    MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_BLOCK_SIZE
 
     def __init__(self, socket, address):
         self.socket = socket
         self.address = address
         self.closed = False
         self.working = None
+        self.run_recieving = False
+        self.peer_chain_size = None
+        self.peer_top_block_hash = None
 
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
@@ -156,13 +160,24 @@ class Connection:
         try:
             while not self.closed:
                 try:
-                    message = self.socket.recv(Connection.HEADER_LEN + Connection.COMMAND_SIZE + dreamveil.Block.MAX_BLOCK_SIZE)
-                    if len(message) >= Connection.HEADER_LEN + Connection.COMMAND_SIZE:
-                        commands = self.parse_messages(message.decode())
-                        for command, param in commands:
-                            self.parse_command(command, param)
+                    while self.working:
+                        if self.closed:
+                            return
+                        self.run_recieving = False
+                    self.run_recieving = True
+                    command_message = self.recv()
+                    valid_command_message = True
+                    if len(command_message) >= Connection.COMMAND_SIZE:
+                        command = command_message[:Connection.COMMAND_SIZE]
+                        argument = command_message[Connection.COMMAND_SIZE:]
+                        if not self.parse_command(command, argument):
+                            valid_command_message = False
                     else:
-                        print(f"### Recieved invalid message (too small in size): {message.decode()}")
+                        valid_command_message = False
+
+                    if not valid_command_message:
+                        print(f"### Recieved message in Connection.run that does not abide by correct format {command_message}")
+
                 except Exception as err:
                     print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
                     self.close()
@@ -186,24 +201,31 @@ class Connection:
         else:
             raise Exception("Cannot send message. Connection is already closed.")
 
-    def recv(message:str):
-        output = []
-        scanned_count = 0
-        while scanned_count < len(message):
-            command_len = message[scanned_count:scanned_count + Connection.HEADER_LEN]
-            try:
-                command_len = command_len.lstrip("0")
-                command_len = int(command_len)
-            except ValueError:
-                print(f"### Recieved invalid message (Wrongly formatted): {message}")
-                break
-            scanned_count += Connection.HEADER_LEN
-            command = message[scanned_count:Connection.COMMAND_SIZE]
-            scanned_count += Connection.COMMAND_SIZE
-            command_message = message[scanned_count: scanned_count + command_len]
-            scanned_count += command_len
-            output.append((command, command_message))
-        return output
+    def recv(self):
+        message = self.socket.recv(Connection.MAX_MESSAGE_SIZE)
+        message_len = message[:Connection.HEADER_LEN]
+        try:
+            message_len = message_len.lstrip("0")
+            message_len = int(message_len)
+        except ValueError:
+            print(f"### Recieved invalid message (Wrongly formatted) from ({self.address}): {message}")
+            # self.close()
+            return None
+        message_contents = message[Connection.HEADER_LEN:message_len]
+        print(f"### Recieved message from ({self.address}): {message}")
+        return message_contents
+
+    def setup(self):
+        self.working = "setup"
+        self.socket.send(Server.singleton.version.encode())
+        peer_version = self.socket.recv(6).decode()
+        if peer_version == Server.singleton.version:
+            print(f"### Connection with {self.address} completed setup (version: {Server.singleton.version})")
+        else:
+            print(f"!!! Peer version {peer_version} is not compatible with the current application version {Server.singleton.version}")
+            # Terminate the connection
+            self.close()
+        self.working = None
 
     #region connection commands
     def connection_command(command_func):
@@ -214,6 +236,10 @@ class Connection:
                     pass
 
                 self.working = command_func.__name__
+                self.send(command_func.__name__)
+                while self.run_recieving:
+                    if self.closed:
+                        return
                 output = command_func(self, *args, **kwargs)
                 self.working = None
                 return output
@@ -223,33 +249,107 @@ class Connection:
         return wrapper
 
     @connection_command
-    def setup(self):
-        self.socket.send(Server.singleton.version.encode())
-        peer_version = self.socket.recv(6).decode()
-        if peer_version != Server.singleton.version:
-            print(f"!!! Peer version {peer_version} is not compatible with the current application version {Server.singleton.version}")
-            # Terminate the connection
-            self.close()
-        else:
-            print(f"### Connection with {self.address} completed setup (version: {Server.singleton.version})")
-
-    @connection_command
     def SENDTX(self, transaction:dreamveil.Transaction):
-        pass
+        self.send(transaction.signature)
+        ans = self.recv()
+        if ans == "True":
+            self.send(transaction.dumps())
 
     @connection_command
     def SENDBK(self, block:dreamveil.Block):
-        pass
+        self.send(block.get_header())
+        ans = self.recv()
+        if ans == "True":
+            self.send(block.dumps())
+
+    @connection_command
+    def CHNTOP(self):
+        chain_top_block = Server.singleton.blockchain.chain[-1]
+        argument = chain_top_block.get_header()
+        self.send(argument)
+        ans = self.recv()
+
+    @connection_command
+    def CHNSYN(self):
+        # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
+        my_chain_len = len(Server.singleton.blockchain.chain)
+        self.send(my_chain_len)
+        hashes = []
+        inventory = []
+        split_index = 0
+        #TODO: IF all hashes are the same (no split) aka same chian then don't create new object just chain to main object
+        while True:
+            hashes = self.recv().split(' ')
+            #TODO: DEBUG splicing
+            for i in range((my_chain_len - len(inventory))-len(hashes), (my_chain_len - len(inventory)))[::-1]:
+                if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
+                    split_index = i+1
+                    hashes = []
+                    break
+                else:
+                    inventory += hashes[i]
+            if len(hashes) == 100:
+                self.send("continue")
+            else:
+                break
+
+        # Create the new blockchain object and fill in the known blocks
+        inventory = inventory[::-1]
+        new_blockchain = dreamveil.Blockchain()
+        for i in range(split_index):
+            new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
+        self.send(str(split_index))
+
+        # Download all the blocks mentioned in the inventory list from the peer
+        for bk_hash in inventory:
+            new_bk = dreamveil.Block.loads(self.recv())
+            chain_result = new_blockchain.chain(new_bk)
+            if new_bk.hash_block != bk_hash or not chain_result:
+                print(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain or has an unmatched hash. {new_bk.hash_block}, {bk_hash}")
+                del new_blockchain
+                self.close()
+                return
+        # If the given blockchain is indeed larger than the current blockchain used
+        if len(new_blockchain.chain) > len(Server.singleton.blockchain.chain):
+            # We swap the blockchain objects to the new larger one.
+            Server.singleton.blockchain = new_blockchain
     #endregion
 
-    def parse_command(self, command:str, param):
+    @connection_command
+    def parse_command(self, command:str, param:str):
         try:
+            # I GOT ...
             match command:
                 case "SENDTX":
-                    param = str(param)
-                case "YELLBK":
+                    raise NotImplementedError()
+                    tx_signature = param
+                    my_top_bk = Server.singleton.blockchain.chain[-1]
+                    if True:
+                        self.send("True")
+                        new_tx = dreamveil.Transaction.loads(self.recv())
+                        if new_tx.signature == tx_signature:
+                            pass
+                        else:
+                            self.close()
+                            return
+                    else:
+                        self.send("False")
+                case "SENDBK":
+                    bk_prev_hash, bk_hash = param.split(' ')
+                    my_top_bk = Server.singleton.blockchain.chain[-1]
+                    if my_top_bk.block_hash == bk_prev_hash:
+                        self.send("True")
+                        new_bk = dreamveil.Block.loads(self.recv())
+                        if new_bk.block_hash == bk_hash:
+                            Server.singleton.blockchain.chain_block(new_bk)
+                        else:
+                            self.close()
+                            return
+                    else:
+                        self.send("False")
+                case "CHNTOP":
                     param = int(param)
-                case "GIVEBK":
+                case "CHNSYN":
                     param = int(param)
                 case "FRIEND":
                     param = str(param).split(',')
@@ -260,7 +360,7 @@ class Connection:
                     assert ipaddress.ip_address(peer_addr)
                 case _:
                     raise ValueError("Unknown command")
-            Server.singleton.events[self.address, command](param)
+
             return True
         except (AssertionError, ValueError) as command_err:
             print(f"!!! Could not parse command {command} from {self.address}")
@@ -316,7 +416,7 @@ print("Loading state from saved files...")
 blockchain, peer_pool = load_state()
 print("Finished loading state")
 
-server = Server(VERSION, peer_pool, application_config["SERVER"]["address"])
+server = Server(VERSION, blockchain, peer_pool, application_config["SERVER"]["address"])
 
 while True:
     time.sleep(10)
