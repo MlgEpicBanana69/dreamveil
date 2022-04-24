@@ -1,6 +1,3 @@
-from itertools import chain
-from attr import has
-from cv2 import split
 import dreamveil
 
 import configparser
@@ -11,7 +8,6 @@ import json
 import random
 import math
 import time
-
 
 import socket
 import threading
@@ -99,7 +95,7 @@ class Server:
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
                 if peer_address[0] not in self.peers.keys():
-                    self.peers[peer_address[0]] = Connection(peer_socket, peer_address)
+                    self.peers[peer_address[0]] = Connection(Connection.CTX_BETA, peer_socket, peer_address)
                     print(f"### {peer_address} connected to node")
                 else:
                     peer_socket.close()
@@ -109,7 +105,7 @@ class Server:
             try:
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
-                new_peer = Connection(peer_socket, address)
+                new_peer = Connection(Connection.CTX_ALPHA, peer_socket, address)
                 self.peers[address] = new_peer
                 print(f"### Server connected to {address}")
                 return new_peer
@@ -140,11 +136,16 @@ class Server:
                 peer.send(message)
 
 class Connection:
+    # Determines the behavior of who interacts first
+    CTX_ALPHA = "ALPHA" # The alpha is the one that initialized the connection and has that right
+    CTX_BETA = "BETA"
+
     COMMAND_SIZE = 6
     HEADER_LEN = len(str(dreamveil.Block.MAX_BLOCK_SIZE))
     MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_BLOCK_SIZE
 
-    def __init__(self, socket, address):
+    def __init__(self, ctx, socket, address):
+        self.ctx = ctx
         self.socket = socket
         self.address = address
         self.closed = False
@@ -167,6 +168,7 @@ class Connection:
                         self.run_recieving = False
                     self.run_recieving = True
                     command_message = self.recv()
+                    self.run_recieving = False
                     valid_command_message = True
                     if len(command_message) >= Connection.COMMAND_SIZE:
                         command = command_message[:Connection.COMMAND_SIZE]
@@ -208,8 +210,9 @@ class Connection:
         try:
             message_len = message_len.lstrip("0")
             message_len = int(message_len)
-        except ValueError:
-            print(f"### Recieved invalid message (Wrongly formatted) from ({self.address}): {message}")
+            assert message_len > 0
+        except (ValueError, AssertionError) as err:
+            print(f"### Recieved (recv) invalid message from ({self.address}): {message} || {err}")
             # self.close()
             return None
         message_contents = message[Connection.HEADER_LEN:message_len]
@@ -218,15 +221,40 @@ class Connection:
 
     def setup(self):
         self.working = "setup"
-        self.socket.send(Server.singleton.version.encode())
-        peer_version = self.socket.recv(6).decode()
-        if peer_version == Server.singleton.version:
-            print(f"### Connection with {self.address} completed setup (version: {Server.singleton.version})")
-        else:
-            print(f"!!! Peer version {peer_version} is not compatible with the current application version {Server.singleton.version}")
+        try:
+            # Check that node versions match
+            self.send(Server.singleton.version)
+            peer_version = self.recv()
+            assert peer_version == Server.singleton.version
+
+            argument = f"{Server.singleton.blockchain.chain[-1].get_header()} {len(Server.singleton.blockchain.chain)}"
+            self.send(argument)
+            peer_chain_len, peer_top_block_hash = self.recv().split(' ')
+            peer_chain_len = int(peer_chain_len)
+            assert peer_chain_len > 0
+            self.peer_chain_len == peer_chain_len
+            self.peer_top_block_hash = peer_top_block_hash
+
+            # TODO: in setup Implement peer and transaction syncying. Implement transaction pool storing
+            # implement whitedoable env loading that's organized
+            # implement online communication-wide encryption (integrity and confidentiallity)
+            # Create a user file system for saving RSA keys (mostly done)
+            # Implement the gui
+            # Implement a block creator/editor/miner
+
+            if self.ctx == Connection.CTX_ALPHA:
+
+                self.send()
+            else:
+                pass
+
+            print(f"### Connection with {self.address} completed setup (version: {peer_version})")
+        except (AssertionError, TimeoutError) as err:
+            print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
             self.close()
-        self.working = None
+        finally:
+            self.working = None
 
     #region connection commands
     def connection_command(command_func):
@@ -264,21 +292,17 @@ class Connection:
             self.send(block.dumps())
 
     @connection_command
-    def CHNTOP(self):
-        chain_top_block = Server.singleton.blockchain.chain[-1]
-        argument = chain_top_block.get_header()
-        self.send(argument)
-        ans = self.recv()
-
-    @connection_command
     def CHNSYN(self):
         # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
         my_chain_len = len(Server.singleton.blockchain.chain)
-        self.send(my_chain_len)
+        self.send(f"{my_chain_len} {Server.singleton.blockchain.chain[-1].block_hash()}")
+
         peer_chain_len, peer_top_block_hash = self.recv().split(' ')
         peer_chain_len = int(peer_chain_len)
+        assert peer_chain_len > 0
         self.peer_chain_len = peer_chain_len
         self.peer_top_block_hash = peer_top_block_hash
+
         if peer_chain_len < my_chain_len + dreamveil.Blockchain.TRUST_HEIGHT:
             self.send("False")
             return
@@ -336,6 +360,7 @@ class Connection:
             # I GOT ...
             match command:
                 case "SENDTX":
+                    #TODO: Properly implement
                     raise NotImplementedError()
                     tx_signature = param
                     my_top_bk = Server.singleton.blockchain.chain[-1]
@@ -362,13 +387,16 @@ class Connection:
                             return
                     else:
                         self.send("False")
-                case "CHNTOP":
-                    param = int(param)
                 case "CHNSYN":
                     peer_chain_len, peer_top_block_hash = self.recv().split(' ')
                     peer_chain_len = int(peer_chain_len)
+                    assert peer_chain_len > 0
                     self.peer_chain_len = peer_chain_len
                     self.peer_top_block_hash = peer_top_block_hash
+
+                    my_chain_len = len(Server.singleton.blockchain.chain)
+                    self.send(f"{my_chain_len} {Server.singleton.blockchain.chain[-1].block_hash()}")
+
                     if self.recv() == "True":
                         hash_batches_sent = 0
                         while True:
@@ -378,7 +406,7 @@ class Connection:
                             if split_index != "continue":
                                 break
                         split_index = int(split_index)
-                        assert split_index >= 0 and split_index < len(Server.singleton.blockchain.chain)
+                        assert split_index >= 0 and split_index < my_chain_len
                         blocks_sent = 0
                         for block in Server.singleton.blockchain.chain[split_index::]:
                             self.send(block.dumps())
@@ -386,20 +414,19 @@ class Connection:
                             self.recv()
                         print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
                 case "FRIEND":
+                    # TODO: Properly implement
                     param = str(param).split(',')
                     for peer_addr in param:
                         assert ipaddress.ip_address(peer_addr)
-                case "LONELY":
-                    param = str(param)
-                    assert ipaddress.ip_address(peer_addr)
                 case _:
                     raise ValueError("Unknown command")
 
             return True
         except (AssertionError, ValueError) as command_err:
-            print(f"!!! Could not parse command {command} from {self.address}")
-            print(f"COMMAND PARAM\n{param}\nEND COMMAND PARAM")
-            print(f"Error that was caught: {command_err}")
+            log_str  = f"!!! Could not parse command {command} from {self.address}\n"
+            log_str += f"COMMAND PARAM\n{param}\nEND COMMAND PARAM\n"
+            log_str += f"Error that was caught: {command_err}"
+            print(log_str)
             return False
 
 def load_state():

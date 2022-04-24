@@ -6,7 +6,6 @@ from Crypto.Hash import SHA256, HMAC
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
 
-
 def encrypt(passphrase:str, pt:str):
     """
     A passphrase based decryption function that uses PBKDF2 with an
