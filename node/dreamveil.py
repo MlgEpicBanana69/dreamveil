@@ -242,6 +242,7 @@ class Block:
                 return self.block_hash
             self.nonce += 1
             self.hash_block()
+
 class Blockchain:
     TRUST_HEIGHT = 6
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
