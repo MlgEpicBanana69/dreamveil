@@ -1,8 +1,7 @@
-# A binary node that can store a value seperate from its key
 import json
 import math
-from re import L
 
+# A binary tree node that can store a value seperate from its key
 class binary_tree_node:
     def __init__(self, key, value=None):
         self.key = key
