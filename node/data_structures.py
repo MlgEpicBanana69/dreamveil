@@ -28,7 +28,7 @@ class AVL:
     def __init__(self):
         self.tree = None
 
-    def find(self, root, key):
+    def _find(self, root, key):
         """Finds and returns the node of a given key in the tree. Returns None if does not exist"""
         if root is not None:
             if key > root.key:
@@ -41,7 +41,10 @@ class AVL:
             # Could not find key in tree
             return None
 
-    def insert(self, root, node):
+    def find(self, key):
+        return self._find(self.tree, key)
+
+    def _insert(self, root, node):
         if self.tree is None:
             self.tree = node
             return
@@ -78,6 +81,9 @@ class AVL:
         if root == self.tree:
             self.tree = out
         return out
+
+    def insert(self, node):
+        self._insert(self.tree, node)
 
     def get_height(self, root):
         if root is None:

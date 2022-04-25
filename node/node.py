@@ -15,12 +15,13 @@ import threading
 
 # TODO TASKS (AMOGUS):
 # Implement transaction pool storing (DONE)
-# in setup implement peer and transaction syncing. (WIP)
+# in setup implement peer and transaction syncing. (DONE)
+
+# Implement a block creator/editor/miner (NIP)
+# Create a user file system for saving RSA keys (WIP)
 # implement whitedoable env loading that's organized (WIP)
 # implement online communication-wide encryption (integrity and confidentiallity) (NIP)
-# Create a user file system for saving RSA keys (WIP)
 # Implement the gui (NIP)
-# Implement a block creator/editor/miner (NIP)
 
 APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
@@ -30,7 +31,7 @@ class Server:
     PEER_STATUS_DEPRECATED = "DEPRECATED"
     PEER_STATUS_UNKNOWN = "UNKNOWN"
 
-    def __init__(self, version:str, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, port=22727, max_peer_amount=150):
+    def __init__(self, version:str, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, miner=True, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -39,6 +40,7 @@ class Server:
         self.address = address
         self.port = port
         self.max_peer_amount = max_peer_amount
+        self.miner = miner
         self.socket = None
         self.blockchain = blockchain
         self.peers = {}
@@ -383,9 +385,10 @@ class Connection:
                 case "SENDTX":
                     tx_signature, tx_efficiency = param.split(' ')
                     try:
+                        assert Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
                         Server.singleton.transaction_pool[tx_efficiency][tx_signature]
                         self.send("False")
-                    except KeyError:
+                    except (KeyError, AssertionError):
                         self.send("True")
                         new_tx = dreamveil.Transaction.loads(self.recv())
                         new_tx_efficiency = str(decimal.Decimal(new_tx.miner_fee) / decimal.Decimal(len(new_tx.dumps())))
@@ -406,7 +409,7 @@ class Connection:
                         self.send("True")
                         new_bk = dreamveil.Block.loads(self.recv())
                         if new_bk.block_hash == bk_hash:
-                            Server.singleton.blockchain.chain_block(new_bk)
+                            assert Server.singleton.blockchain.chain_block(new_bk)
                             for peer_addr, peer_connection in Server.singleton.peers.items():
                                 if peer_addr != self.address:
                                     action_thread = threading.Thread(target=peer_connection.SENDBK, args=(new_bk,))
@@ -449,7 +452,7 @@ class Connection:
                         print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
             return True
         except (AssertionError, ValueError) as command_err:
-            log_str  = f"!!! Could not parse command {command} from {self.address}\n"
+            log_str  = f"!!! Failure while executing {command} from {self.address}\n"
             log_str += f"COMMAND PARAM\n{param}\nEND COMMAND PARAM\n"
             log_str += f"Error that was caught: {command_err}"
             print(log_str)
