@@ -13,6 +13,15 @@ import decimal
 import socket
 import threading
 
+# TODO TASKS (AMOGUS):
+# Implement transaction pool storing (DONE)
+# in setup implement peer and transaction syncing. (WIP)
+# implement whitedoable env loading that's organized (WIP)
+# implement online communication-wide encryption (integrity and confidentiallity) (NIP)
+# Create a user file system for saving RSA keys (WIP)
+# Implement the gui (NIP)
+# Implement a block creator/editor/miner (NIP)
+
 APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
 class Server:
@@ -100,7 +109,7 @@ class Server:
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
                 if peer_address[0] not in self.peers.keys():
-                    self.peers[peer_address[0]] = Connection(Connection.CTX_BETA, peer_socket, peer_address)
+                    self.peers[peer_address[0]] = Connection(peer_socket, peer_address)
                     print(f"### {peer_address} connected to node")
                 else:
                     peer_socket.close()
@@ -110,7 +119,7 @@ class Server:
             try:
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
-                new_peer = Connection(Connection.CTX_ALPHA, peer_socket, address)
+                new_peer = Connection(peer_socket, address)
                 self.peers[address] = new_peer
                 print(f"### Server connected to {address}")
                 return new_peer
@@ -155,16 +164,11 @@ class Server:
         return output
 
 class Connection:
-    # Determines the behavior of who interacts first
-    CTX_ALPHA = "ALPHA" # The alpha is the one that initialized the connection and has that right
-    CTX_BETA = "BETA"
-
     COMMAND_SIZE = 6
     HEADER_LEN = len(str(dreamveil.Block.MAX_BLOCK_SIZE))
     MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_BLOCK_SIZE
 
-    def __init__(self, ctx, socket, address):
-        self.ctx = ctx
+    def __init__(self, socket, address):
         self.socket = socket
         self.address = address
         self.closed = False
@@ -254,13 +258,6 @@ class Connection:
             self.peer_chain_len == peer_chain_len
             self.peer_top_block_hash = peer_top_block_hash
 
-            # TODO: in setup Implement peer and transaction syncing. Implement transaction pool storing
-            # implement whitedoable env loading that's organized
-            # implement online communication-wide encryption (integrity and confidentiallity)
-            # Create a user file system for saving RSA keys (mostly done)
-            # Implement the gui
-            # Implement a block creator/editor/miner
-
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
             peers_to_share = random.sample(Server.singleton.peer_pool.keys(), 100)
             self.send(" ".join(peers_to_share))
@@ -270,11 +267,6 @@ class Connection:
                 assert ipaddress.ip_address(peer)
                 if peer not in Server.singleton.peer_pool:
                     Server.singleton.peer_pool[peer] = Server.PEER_STATUS_UNKNOWN
-
-            if self.ctx == Connection.CTX_ALPHA:
-                pass
-            else:
-                pass
 
             print(f"### Connection with {self.address} completed setup (version: {peer_version})")
         except (AssertionError, TimeoutError) as err:
@@ -289,9 +281,9 @@ class Connection:
         def wrapper(self, *args, **kwargs):
             try:
                 # Halt sending commands until the previous command has finished
-                while self.working is not None and not self.closed:
-                    pass
-
+                while self.working is not None:
+                    if not self.closed:
+                        return
                 self.working = command_func.__name__
                 self.send(command_func.__name__)
                 while self.run_recieving:
@@ -399,21 +391,36 @@ class Connection:
                         new_tx_efficiency = str(decimal.Decimal(new_tx.miner_fee) / decimal.Decimal(len(new_tx.dumps())))
                         if new_tx.signature == tx_signature and new_tx_efficiency == tx_efficiency:
                             Server.singleton.add_to_transaction_pool(new_tx)
+                            for peer_addr, peer_connection in Server.singleton.peers.items():
+                                if peer_addr != self.address:
+                                    action_thread = threading.Thread(target=peer_connection.SENDTX, args=(new_tx,))
+                                    action_thread.start()
                         else:
                             self.close()
                 case "SENDBK":
                     bk_prev_hash, bk_hash = param.split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
+                    self.peer_chain_len += 1
+                    self.peer_top_block_hash = new_bk.block_hash
                     if my_top_bk.block_hash == bk_prev_hash:
                         self.send("True")
                         new_bk = dreamveil.Block.loads(self.recv())
                         if new_bk.block_hash == bk_hash:
                             Server.singleton.blockchain.chain_block(new_bk)
+                            for peer_addr, peer_connection in Server.singleton.peers.items():
+                                if peer_addr != self.address:
+                                    action_thread = threading.Thread(target=peer_connection.SENDBK, args=(new_bk,))
+                                    action_thread.start()
                         else:
                             self.close()
                             return
                     else:
                         self.send("False")
+                        #region Check to see if peer's chain is significantly larger than the current one used
+                        if self.peer_chain_len - len(Server.singleton.blockchain.chain) >= dreamveil.Blockchain.TRUST_HEIGHT:
+                            print(f"### Noticed that {self.address} uses a significantly larger chain (dHchain = {self.peer_chain_len - len(Server.singleton.blockchain.chain)})... Starting to sync with it")
+                            chnsyn_thread = threading.Thread(target=self.CHNSYN)
+                            chnsyn_thread.start()
                 case "CHNSYN":
                     peer_chain_len, peer_top_block_hash = self.recv().split(' ')
                     peer_chain_len = int(peer_chain_len)
@@ -440,7 +447,6 @@ class Connection:
                             blocks_sent+=1
                             self.recv()
                         print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
-
             return True
         except (AssertionError, ValueError) as command_err:
             log_str  = f"!!! Could not parse command {command} from {self.address}\n"
@@ -499,6 +505,6 @@ print("Finished loading state")
 
 server = Server(VERSION, blockchain, peer_pool, application_config["SERVER"]["address"])
 
+# Main thread loop
 while True:
-    time.sleep(10)
-    #print("Yes the thread does work bruh moment")
+    pass
