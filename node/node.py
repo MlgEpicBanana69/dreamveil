@@ -16,7 +16,9 @@ APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
 class Server:
     singleton = None
-
+    PEER_STATUS_CONVERSED = "CONVERSED"
+    PEER_STATUS_DEPRECATED = "DEPRECATED"
+    PEER_STATUS_UNKNOWN = "UNKNOWN"
     def __init__(self, version:str, blockchain:dreamveil.Blockchain, peer_pool:dict, address:str, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
@@ -41,9 +43,9 @@ class Server:
         peer_options = []
         deprecated_peer_options = []
         for peer, status in self.peer_pool.items():
-            if status != "DEPRECATED" and peer not in self.peers.keys():
+            if status != Server.PEER_STATUS_DEPRECATED and peer not in self.peers.keys():
                 peer_options.append(peer)
-            elif status == "DEPRECATED" and peer not in self.peers.keys():
+            elif status == Server.PEER_STATUS_DEPRECATED and peer not in self.peers.keys():
                 deprecated_peer_options.append(peer)
         if len(peer_options) > 0:
             output = random.choice(peer_options)
@@ -78,11 +80,11 @@ class Server:
                     connection_result = self.connect(new_peer)
                     if connection_result is None:
                         # TODO: Define peer status system
-                        if peer_pool[new_peer] != "DEPRECATED":
-                            peer_pool[new_peer] = "DEPRECATED"
+                        if peer_pool[new_peer] != Server.PEER_STATUS_DEPRECATED:
+                            peer_pool[new_peer] = Server.PEER_STATUS_DEPRECATED
                             print(f"### Marked {new_peer} as DEPRECATED")
                     else:
-                        peer_pool[new_peer] = "CONVERSED"
+                        peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
 
     def accepter(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -235,16 +237,25 @@ class Connection:
             self.peer_chain_len == peer_chain_len
             self.peer_top_block_hash = peer_top_block_hash
 
-            # TODO: in setup Implement peer and transaction syncying. Implement transaction pool storing
+            # TODO: in setup Implement peer and transaction syncing. Implement transaction pool storing
             # implement whitedoable env loading that's organized
             # implement online communication-wide encryption (integrity and confidentiallity)
             # Create a user file system for saving RSA keys (mostly done)
             # Implement the gui
             # Implement a block creator/editor/miner
 
-            if self.ctx == Connection.CTX_ALPHA:
+            # Send and recieve 100 random peers to further establish the connection of nodes into the network
+            peers_to_share = random.sample(Server.singleton.peer_pool.keys(), 100)
+            self.send(" ".join(peers_to_share))
+            newly_given_peers = self.recv().split(' ')
+            assert len(newly_given_peers) <= 100
+            for peer in newly_given_peers:
+                assert ipaddress.ip_address(peer)
+                if peer not in Server.singleton.peer_pool:
+                    Server.singleton.peer_pool[peer] = Server.PEER_STATUS_UNKNOWN
 
-                self.send()
+            if self.ctx == Connection.CTX_ALPHA:
+                pass
             else:
                 pass
 
