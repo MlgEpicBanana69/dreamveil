@@ -8,6 +8,7 @@ import json
 import random
 import math
 import time
+import decimal
 
 import socket
 import threading
@@ -19,7 +20,8 @@ class Server:
     PEER_STATUS_CONVERSED = "CONVERSED"
     PEER_STATUS_DEPRECATED = "DEPRECATED"
     PEER_STATUS_UNKNOWN = "UNKNOWN"
-    def __init__(self, version:str, blockchain:dreamveil.Blockchain, peer_pool:dict, address:str, port=22727, max_peer_amount=150):
+
+    def __init__(self, version:str, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -32,6 +34,7 @@ class Server:
         self.blockchain = blockchain
         self.peers = {}
         self.peer_pool = peer_pool
+        self.transaction_pool = transaction_pool
         self.closed = False
         self.seeker_thread = threading.Thread(target=self.seeker)
         self.accepter_thread = threading.Thread(target=self.accepter)
@@ -136,6 +139,20 @@ class Server:
         for peer_addr, peer in self.peers.items():
             if peer_addr not in exclusions:
                 peer.send(message)
+
+    def add_to_transaction_pool(self, transaction:dreamveil.Transaction):
+        transaction_efficiency = str(decimal.Decimal(transaction.miner_fee) / decimal.Decimal(len(transaction.dumps())))
+        if transaction_efficiency not in self.transaction_pool:
+            self.transaction_pool[transaction_efficiency] = {}
+        self.transaction_pool[transaction_efficiency][transaction.signature] = transaction
+
+    def pop_from_transaction_pool(self):
+        best_efficiency = sorted(self.transaction_pool, key=decimal.Decimal)[-1]
+        output = self.transaction_pool[best_efficiency].values()[0]
+        del self.transaction_pool[best_efficiency][output.signature]
+        if len(self.transaction_pool[best_efficiency]) == 0:
+            del self.transaction_pool[best_efficiency]
+        return output
 
 class Connection:
     # Determines the behavior of who interacts first
@@ -371,20 +388,17 @@ class Connection:
             # I GOT ...
             match command:
                 case "SENDTX":
-                    #TODO: Properly implement
-                    raise NotImplementedError()
-                    tx_signature = param
-                    my_top_bk = Server.singleton.blockchain.chain[-1]
-                    if True:
+                    tx_signature, tx_efficiency = param.split(' ')
+                    try:
+                        Server.singleton.transaction_pool[tx_efficiency][tx_signature]
+                        self.send("False")
+                    except KeyError:
                         self.send("True")
                         new_tx = dreamveil.Transaction.loads(self.recv())
                         if new_tx.signature == tx_signature:
-                            pass
+                            Server.singleton.add_to_transaction_pool(new_tx)
                         else:
                             self.close()
-                            return
-                    else:
-                        self.send("False")
                 case "SENDBK":
                     bk_prev_hash, bk_hash = param.split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
@@ -424,13 +438,6 @@ class Connection:
                             blocks_sent+=1
                             self.recv()
                         print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
-                case "FRIEND":
-                    # TODO: Properly implement
-                    param = str(param).split(',')
-                    for peer_addr in param:
-                        assert ipaddress.ip_address(peer_addr)
-                case _:
-                    raise ValueError("Unknown command")
 
             return True
         except (AssertionError, ValueError) as command_err:
