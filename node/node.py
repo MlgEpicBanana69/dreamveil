@@ -307,7 +307,8 @@ class Connection:
 
     @connection_command
     def SENDTX(self, transaction:dreamveil.Transaction):
-        self.send(transaction.signature)
+        transaction_efficiency = str(decimal.Decimal(transaction.miner_fee) / decimal.Decimal(len(transaction.dumps())))
+        self.send(f"{transaction.signature} {transaction_efficiency}")
         ans = self.recv()
         if ans == "True":
             self.send(transaction.dumps())
@@ -395,7 +396,8 @@ class Connection:
                     except KeyError:
                         self.send("True")
                         new_tx = dreamveil.Transaction.loads(self.recv())
-                        if new_tx.signature == tx_signature:
+                        new_tx_efficiency = str(decimal.Decimal(new_tx.miner_fee) / decimal.Decimal(len(new_tx.dumps())))
+                        if new_tx.signature == tx_signature and new_tx_efficiency == tx_efficiency:
                             Server.singleton.add_to_transaction_pool(new_tx)
                         else:
                             self.close()
