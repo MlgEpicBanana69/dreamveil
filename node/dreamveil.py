@@ -74,7 +74,7 @@ class Transaction:
             if len(input_key) != 64:
                 if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK"):
                     return False
-            if not self.zero_knowledge_range_test(input_value):
+            if input_value < 0:
                 return False
             inputs_sum += input_value
 
@@ -88,16 +88,12 @@ class Transaction:
                 return False
             if len(output_key) != 64:
                 return False
-            if not self.zero_knowledge_range_test(output_value):
+            if input_value < 0:
                 return False
             outputs_sum += output_value
 
         # Confirm equality.
         return inputs_sum == outputs_sum
-
-    def zero_knowledge_range_test(self, value):
-        # TODO: implement a zero-knowledge proof
-        return value >= 0
 
     @staticmethod
     def loads(json_str:str):
