@@ -8,7 +8,7 @@ import json
 import random
 import math
 import time
-import decimal
+from Crypto.PublicKey import RSA
 
 import socket
 import threading
@@ -23,6 +23,15 @@ import threading
 # implement online communication-wide encryption (integrity and confidentiallity) (NIP)
 # Implement the gui (NIP)
 
+# Behavior of miner:
+#   Will use the most rewarding transactions to form a block.
+#   Will actively attempt to solve the block by finding the nonce solution
+# Behavior of non-miner:
+#   Does not try to form a block using transactions
+#   Does not attempt to solve any blocks
+
+# TODO: Shifting prefer longest chain to prefer heaviest chain CRITICAL!!!
+
 APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
 class Server:
@@ -31,22 +40,26 @@ class Server:
     PEER_STATUS_DEPRECATED = "DEPRECATED"
     PEER_STATUS_UNKNOWN = "UNKNOWN"
 
-    def __init__(self, version:str, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, miner=True, port=22727, max_peer_amount=150):
+    RSA.RsaKey().public
+
+    def __init__(self, version:str, host_keys:RSA.RsaKey,  blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, is_miner, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
+        self.host_keys = host_keys
         self.version = version
         self.address = address
         self.port = port
         self.max_peer_amount = max_peer_amount
-        self.miner = miner
+        self.is_miner = is_miner
         self.socket = None
         self.blockchain = blockchain
         self.peers = {}
         self.peer_pool = peer_pool
         self.transaction_pool = transaction_pool
         self.closed = False
+        self.miner_thread = threading.Thread(target=self.miner)
         self.seeker_thread = threading.Thread(target=self.seeker)
         self.accepter_thread = threading.Thread(target=self.accepter)
         self.run_thread = threading.Thread(target=self.run)
@@ -78,6 +91,8 @@ class Server:
         self.seeker_thread.start()
 
         print("Server is now running...")
+        if self.is_miner:
+            self.miner_thread.start()
         while True:
            print(f"### {len(self.peers)}/{self.max_peer_amount} connected. Current peer pool size: {len(self.peer_pool)}")
            time.sleep(60)
@@ -152,18 +167,23 @@ class Server:
                 peer.send(message)
 
     def add_to_transaction_pool(self, transaction:dreamveil.Transaction):
-        transaction_efficiency = str(decimal.Decimal(transaction.miner_fee) / decimal.Decimal(len(transaction.dumps())))
+        transaction_efficiency = str(dreamveil.to_decimal(transaction.miner_fee) / dreamveil.to_decimal(len(transaction.dumps())))
         if transaction_efficiency not in self.transaction_pool:
             self.transaction_pool[transaction_efficiency] = {}
         self.transaction_pool[transaction_efficiency][transaction.signature] = transaction
 
     def pop_from_transaction_pool(self):
-        best_efficiency = sorted(self.transaction_pool, key=decimal.Decimal)[-1]
+        best_efficiency = sorted(self.transaction_pool, key=dreamveil.to_decimal)[-1]
         output = self.transaction_pool[best_efficiency].values()[0]
         del self.transaction_pool[best_efficiency][output.signature]
         if len(self.transaction_pool[best_efficiency]) == 0:
             del self.transaction_pool[best_efficiency]
         return output
+
+    def miner(self):
+        # TODO: Properly and fully implement
+        mined_block = dreamveil.Block(self.blockchain.chain[-1].block_hash, [], 0, "")
+        miner_reward_transaction = dreamveil.Transaction("", 0, [self.host_keys.], [], "", "", "").sign()
 
 class Connection:
     COMMAND_SIZE = 6
@@ -301,7 +321,7 @@ class Connection:
 
     @connection_command
     def SENDTX(self, transaction:dreamveil.Transaction):
-        transaction_efficiency = str(decimal.Decimal(transaction.miner_fee) / decimal.Decimal(len(transaction.dumps())))
+        transaction_efficiency = str(dreamveil.to_decimal(transaction.miner_fee) / dreamveil.to_decimal(len(transaction.dumps())))
         self.send(f"{transaction.signature} {transaction_efficiency}")
         ans = self.recv()
         if ans == "True":
@@ -391,7 +411,7 @@ class Connection:
                     except (KeyError, AssertionError):
                         self.send("True")
                         new_tx = dreamveil.Transaction.loads(self.recv())
-                        new_tx_efficiency = str(decimal.Decimal(new_tx.miner_fee) / decimal.Decimal(len(new_tx.dumps())))
+                        new_tx_efficiency = str(dreamveil.to_decimal(new_tx.miner_fee) / dreamveil.to_decimal(len(new_tx.dumps())))
                         if new_tx.signature == tx_signature and new_tx_efficiency == tx_efficiency:
                             Server.singleton.add_to_transaction_pool(new_tx)
                             for peer_addr, peer_connection in Server.singleton.peers.items():

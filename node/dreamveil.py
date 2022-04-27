@@ -2,11 +2,28 @@ from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 import secrets
 import decimal
-from decimal import Decimal
 import json
 import copy
 
 import data_structures
+
+def to_decimal(number:str):
+    """
+    Converts a string represting a number to Decimal.
+    This function does not allow otherwise legal special Decimals such as NaN and infinities.
+    It also does not allow the use of filler in the number string.
+    In case of failure, raises decimal.InvalidOperation error
+    :returns: decimal.Decimal number
+    """
+    if type(number) == str:
+        for c in number:
+            if not c.isdigit() and c != ".":
+                break
+        else:
+            output = decimal.Decimal(number)
+            if output.is_finite():
+                return output
+    raise decimal.InvalidOperation(f"Invalid number given")
 
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
@@ -18,7 +35,7 @@ class Transaction:
         assert type(nonce) == str and type(signature) == str
 
         self.sender = sender
-        self.miner_fee = Decimal(miner_fee)
+        self.miner_fee = to_decimal(miner_fee)
         self.inputs = inputs
         self.outputs = outputs
         self.message = message
@@ -42,7 +59,7 @@ class Transaction:
         digital_signature = hex((int(transaction_hash, base=16) ** p_key.e) % p_key.n)[2::]
         # Set and return the generated digital signature
         self.signature = digital_signature
-        return digital_signature
+        return self
 
     def verify_signature(self):
         """Verifies if the digital signature of the transaction is the same as its true computed digital signature"""
@@ -59,41 +76,38 @@ class Transaction:
 
     def verify_io(self):
         """Checks that IO is both in correct format and maintain currency equality"""
-
-        if len(self.inputs) == 0 or len(self.outputs) == 0:
-            return False
-
-        inputs_sum = 0
-        for input_key in self.inputs.keys():
-            try:
-                input_value = Decimal(self.inputs[input_key])
-            except decimal.InvalidOperation:
+        try:
+            if len(self.inputs) == 0 or len(self.outputs) == 0:
                 return False
-            if type(input_key) != str:
-                return False
-            if len(input_key) != 64:
-                if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK"):
+            #TODO: Debug
+            inputs_sum = 0
+            for input_key in self.inputs.keys():
+                input_value = to_decimal(self.inputs[input_key])
+                if type(input_key) != str:
                     return False
-            if input_value < 0:
-                return False
-            inputs_sum += input_value
+                if len(input_key) != 64:
+                    if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK" and to_decimal(self.miner_fee) == 0):
+                        return False
+                if input_value < 0:
+                    return False
+                inputs_sum += input_value
 
-        outputs_sum = self.miner_fee
-        for output_key in self.outputs.keys():
-            try:
-                output_value = Decimal(self.outputs[output_key])
-            except decimal.InvalidOperation:
-                return False
-            if type(output_key) != str:
-                return False
-            if len(output_key) != 64:
-                return False
-            if input_value < 0:
-                return False
-            outputs_sum += output_value
+            outputs_sum = self.miner_fee
+            for output_key in self.outputs.keys():
+                output_value = to_decimal(self.outputs[output_key])
+                assert output_value.is_finite()
+                if type(output_key) != str:
+                    return False
+                if len(output_key) != 64:
+                    return False
+                if input_value < 0:
+                    return False
+                outputs_sum += output_value
 
-        # Confirm equality.
-        return inputs_sum == outputs_sum
+            # Confirm equality.
+            return inputs_sum == outputs_sum
+        except (AssertionError, decimal.InvalidOperation):
+            return False
 
     @staticmethod
     def loads(json_str:str):
@@ -104,7 +118,7 @@ class Transaction:
             assert len(information) == 7
 
             assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
-            assert type(information[1]) == str and Decimal(information[1]) >= 0
+            assert type(information[1]) == str and to_decimal(information[1]) >= 0
             assert type(information[2]) == dict
             assert type(information[3]) == dict
             assert type(information[4]) == str and len(information[4]) <= 222
@@ -130,7 +144,7 @@ class Transaction:
 class Block:
     MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
-    def __init__(self, previous_block_hash:str, transactions:list, nonce:int = 0, block_hash:str = ""):
+    def __init__(self, previous_block_hash:str, transactions:list, nonce:int, block_hash:str):
         assert type(previous_block_hash) == str and type(transactions) == list and type(nonce) == int and type(block_hash) == str
 
         self.previous_block_hash = previous_block_hash
@@ -289,7 +303,7 @@ class Blockchain:
         Transactions do not recognize other transactions in the same block to prevent order frauding
         """
 
-        block_fees = Decimal(0)
+        block_fees = to_decimal(0)
         miner_reward_transaction = None
         # For each transaction in the block
         for transaction in block.transactions:
@@ -308,11 +322,11 @@ class Blockchain:
                         return False
                 else:
                     miner_reward_transaction = transaction
-            block_fees += Decimal(transaction.miner_fee)
+            block_fees += to_decimal(transaction.miner_fee)
 
-        proposed_block_reward = Decimal(0)
+        proposed_block_reward = to_decimal(0)
         for output in miner_reward_transaction.outputs.values():
-            proposed_block_reward += Decimal(output)
+            proposed_block_reward += to_decimal(output)
         if proposed_block_reward != Blockchain.calculate_block_reward(block_height) + block_fees:
             print("Block rejected in verify_block (Miner transaction does not evaluate to the correct amount)")
             return False
@@ -341,12 +355,12 @@ class Blockchain:
         sum of geometric series = 2 * a0 = 76422240
         Total currency amount 76422240
         """
-        q = Decimal(0.5)
+        q = to_decimal(0.5)
         n = height // Blockchain.BLOCK_REWARD_SEASON
         block_reward = Blockchain.BLOCK_INITIAL_REWARD * q**n
         for transaction in block_reward.transactions:
             block_reward += transaction.miner_fee
-        return Decimal(block_reward)
+        return to_decimal(block_reward)
 
 # debugging
 if __name__ == '__main__':
