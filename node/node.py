@@ -41,7 +41,7 @@ class Server:
     PEER_STATUS_OFFLINE = "OFFLINE"
     PEER_STATUS_UNKNOWN = "UNKNOWN"
 
-    def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, is_miner, port=22727, max_peer_amount=150):
+    def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -160,18 +160,14 @@ class Server:
         self.closed = True
 
     def add_to_transaction_pool(self, transaction:dreamveil.Transaction):
-        transaction_efficiency = str(dreamveil.to_decimal(transaction.miner_fee) / dreamveil.to_decimal(len(transaction.dumps())))
-        if transaction_efficiency not in self.transaction_pool:
-            self.transaction_pool[transaction_efficiency] = {}
-        self.transaction_pool[transaction_efficiency][transaction.signature] = transaction
+        self.transaction_pool.append(transaction)
+        self.transaction_pool.sort(key=transaction.calculate_efficiency)
 
-    def pop_from_transaction_pool(self):
-        best_efficiency = sorted(self.transaction_pool, key=dreamveil.to_decimal)[-1]
-        output = self.transaction_pool[best_efficiency].values()[0]
-        del self.transaction_pool[best_efficiency][output.signature]
-        if len(self.transaction_pool[best_efficiency]) == 0:
-            del self.transaction_pool[best_efficiency]
-        return output
+    def find_in_transaction_pool(self, signature:str):
+        for tr in self.transaction_pool:
+            if tr.signature == signature:
+                return tr
+        raise ValueError(f"{signature} is not in list")
 
     def miner(self):
         # TODO: Properly and fully implement
@@ -180,6 +176,23 @@ class Server:
         my_address = dreamveil.key_to_address(self.host_keys.public_key())
         miner_reward_transaction = dreamveil.Transaction("", 0, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "")
         mined_block.add_transaction(miner_reward_transaction)
+
+        transaction_pool_len = len(self.transaction_pool)
+        while not self.closed:
+            if len(self.transaction_pool) != transaction_pool_len:
+                for pool_transaction in self.transaction_pool:
+                    if pool_transaction not in mined_block.transactions:
+                        try:
+                            mined_block.add_transaction(pool_transaction)
+                        except ValueError:
+                            break
+                block_reward = mined_block.reward
+                miner_reward_transaction = dreamveil.Transaction("", 0, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "")
+            
+
+                
+
+
 
 
 class Connection:
@@ -261,16 +274,15 @@ class Connection:
             # I GOT ...
             match command:
                 case "SENDTX":
-                    tx_signature, tx_efficiency = param.split(' ')
+                    tx_signature = param.split(' ')
                     try:
                         assert Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
-                        Server.singleton.transaction_pool[tx_efficiency][tx_signature]
+                        Server.find_in_transaction_pool(tx_signature)
                         self.send("False")
-                    except (KeyError, AssertionError):
+                    except (ValueError, AssertionError):
                         self.send("True")
                         new_tx = dreamveil.Transaction.loads(self.recv())
-                        new_tx_efficiency = str(dreamveil.to_decimal(new_tx.miner_fee) / dreamveil.to_decimal(len(new_tx.dumps())))
-                        if new_tx.signature == tx_signature and new_tx_efficiency == tx_efficiency:
+                        if new_tx.signature == tx_signature:
                             Server.singleton.add_to_transaction_pool(new_tx)
                             for peer_addr, peer_connection in Server.singleton.peers.items():
                                 if peer_addr != self.address:
@@ -387,8 +399,7 @@ class Connection:
     #region connection commands
     @connection_command
     def SENDTX(self, transaction:dreamveil.Transaction):
-        transaction_efficiency = str(dreamveil.to_decimal(transaction.miner_fee) / dreamveil.to_decimal(len(transaction.dumps())))
-        self.send(f"{transaction.signature} {transaction_efficiency}")
+        self.send(transaction.signature)
         ans = self.recv()
         if ans == "True":
             self.send(transaction.dumps())

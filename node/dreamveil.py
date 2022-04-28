@@ -155,8 +155,11 @@ class Transaction:
         information = [self.sender, str(self.miner_fee), self.inputs, self.outputs, self.message, self.nonce]
         return repr(information)
 
+    def calculate_efficiency(self):
+        return to_decimal(self.miner_fee) / to_decimal(len(self.dumps()))
+
 class Block:
-    MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
+    MAX_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
     def __init__(self, previous_block_hash:str, transactions:list, nonce:str, block_hash:str):
         assert type(previous_block_hash) == str and type(transactions) == list and type(nonce) == int and type(block_hash) == str
@@ -170,7 +173,13 @@ class Block:
         return self.dumps()
 
     def add_transaction(self, transaction:Transaction):
+        old_nonce, old_hash = self.block_hash, self.nonce
         self.transactions.append(transaction)
+        self.mine()
+        if len(self.dumps()) > Block.MAX_SIZE:
+            del self.transactions[-1]
+            self.block_hash, self.nonce = old_hash, old_nonce
+            raise ValueError("Transaction too large to be added to block")
 
     def remove_transaction(self, transaction:Transaction):
         self.transactions.remove(transaction)
@@ -187,7 +196,7 @@ class Block:
     def loads(json_str):
         # TODO: DEBUG THIS
         try:
-            assert len(json_str.encode()) <= Block.MAX_BLOCK_SIZE
+            assert len(json_str.encode()) <= Block.MAX_SIZE
             information = json.loads(json_str)
             assert type(information) == list
             assert len(information) == 4
@@ -257,13 +266,22 @@ class Block:
         """Returns a short str containing the descriptive variables of the block seperated by space. Used for identification."""
         return f"{self.previous_block_hash} {self.block_hash}"
 
-    def mine(self, difficulty_target:int):
-        """Tries to find a block solution by repeated guessing"""
-        while True:
-            if self.block_hash[:difficulty_target] == "0"*difficulty_target:
-                return self.block_hash
-            self.nonce += 1
-            self.hash_block()
+    def mine(self):
+        """
+        Guesses a block solution
+        :returns: str Block hash
+        """
+        self.nonce = secrets.token_hex(32)
+        return self.hash_block()
+
+    def calculate_difficulty(self):
+        difficulty = 1
+        for b in self.block_hash:
+            if not b:
+                difficulty *= 2
+            else:
+                break
+        return difficulty
 
 class Blockchain:
     TRUST_HEIGHT = 6
