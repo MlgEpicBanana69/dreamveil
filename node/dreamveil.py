@@ -59,17 +59,17 @@ class Transaction:
     def __repr__(self):
         return self.dumps()
 
-    def sign(self, p_key:RSA.RsaKey):
-        """Signs the transaction object after generating a random Nonce for it using RSA
-            :param: p_key: The private key related to the sender's wallet
-            :returns: The produced digital signature"""
+    def sign(self, private_key:RSA.RsaKey):
+        """Signs the transaction object after generating a random Nonce
+           :param private_key: The private key related to the sender's wallet
+           :returns: The produced digital signature"""
         # Generate and set a random Nonce
         self.nonce = secrets.token_hex(32)
         # Generate the transaction hash (Including the nonce)
         # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
         transaction_hash = SHA256.new(self.get_contents().encode()).hexdigest()
-        # Encrypt the transaction hash using the RSA private key (Digital signature)
-        digital_signature = hex((int(transaction_hash, base=16) ** p_key.e) % p_key.n)[2::]
+        # Sign the transaction hash using the RSA private key
+        digital_signature = hex((int(transaction_hash, base=16) ** private_key.e) % private_key.n)[2::]
         # Set and return the generated digital signature
         self.signature = digital_signature
         return self
@@ -78,7 +78,7 @@ class Transaction:
         """Verifies if the digital signature of the transaction is the same as its true computed digital signature"""
         # TODO DEBUG THIS
         try:
-            rsa_public_key = RSA.import_key(self.sender)
+            rsa_public_key = address_to_key(self.sender)
             computed_hash = SHA256.new(self.dumps().encode()).hexdigest()
             proposed_hash = hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[2::]
             if secrets.compare_digest(computed_hash, proposed_hash):
@@ -90,7 +90,7 @@ class Transaction:
     def verify_io(self):
         """Checks that IO is both in correct format and maintain currency equality"""
         try:
-            if len(self.inputs) == 0 or len(self.outputs) == 0:
+            if (len(self.inputs) != 0 and len(self.outputs) == 0) or (len(self.inputs) == 0 and len(self.outputs) != 0):
                 return False
 
             has_miner_fee = False
@@ -185,6 +185,12 @@ class Block:
         return self.dumps()
 
     def add_transaction(self, transaction:Transaction):
+        """
+        Appends a transaction to the block's transaction list and performs one mining attempt.
+        The block has its nonce and hash refreshed.
+        Fails if the length of the resulting block exceeds MAX_SIZE.
+        :param list transaction: The transaction to append
+        """
         old_nonce, old_hash = self.block_hash, self.nonce
         self.transactions.append(transaction)
         self.mine()
@@ -194,6 +200,10 @@ class Block:
             raise ValueError("Transaction too large to be added to block")
 
     def remove_transaction(self, transaction:Transaction):
+        """
+        Removes a transaction from the block's transaction list.
+        :param list transaction: The transaction to remove
+        """
         self.transactions.remove(transaction)
 
     def get_contents(self):
@@ -201,6 +211,10 @@ class Block:
         return repr(information)
 
     def hash_block(self):
+        """
+        Calculates and sets the hash of the block
+        :returns: str block_hash
+        """
         self.block_hash = SHA256.new(self.get_contents().encode()).hexdigest()
         return self.block_hash
 
@@ -221,20 +235,7 @@ class Block:
             # TODO: Debug this bs
             for transaction in information[1]:
                 transactions.append(Transaction.loads(transaction))
-
-            # Verifies that there are no duplicate transactions
-            all_signatures = [t.signature for t in transactions]
-            for signature in all_signatures:
-                assert all_signatures.count(signature) == 1
-
-            # Verifies that there are no duplicate input-sender pairs
-            decayed_outputs = []
-            for transaction in transactions:
-                for transaction_input in transaction.inputs.keys():
-                    decayed_output = (transaction_input, transaction.sender)
-                    assert decayed_output not in decayed_outputs
-                    decayed_outputs.append(decayed_output)
-
+            assert Block.verify_transactions(transactions)
             information[1] = transactions
             #endregion
             assert information[2] >= 0
@@ -248,9 +249,22 @@ class Block:
             print("Block rejected!")
             raise err
 
-    def dumps(self):
-        information = [self.previous_block_hash, self.transactions, self.nonce, self.block_hash]
-        return repr(information)
+    def verify_transactions(block_transactions:list):
+        try:
+            # Verifies that there are no duplicate transactions
+            all_signatures = [t.signature for t in block_transactions]
+            for signature in all_signatures:
+                assert all_signatures.count(signature) == 1
+            # Verifies that there are no duplicate input-sender pairs
+            decayed_outputs = []
+            for transaction in block_transactions:
+                for transaction_input in transaction.inputs.keys():
+                    decayed_output = (transaction_input, transaction.sender)
+                    assert decayed_output not in decayed_outputs
+                    decayed_outputs.append(decayed_output)
+            return True
+        except AssertionError:
+            return False
 
     def verify_block_has_reward(self):
         """Checks that the block has one miner reward transaction and only one.
@@ -270,6 +284,10 @@ class Block:
         output = secrets.compare_digest(proposed_hash, computed_hash)
         self.block_hash = proposed_hash
         return output
+
+    def dumps(self):
+        information = [self.previous_block_hash, self.transactions, self.nonce, self.block_hash]
+        return repr(information)
 
     def get_header(self):
         """Returns a short str containing the descriptive variables of the block seperated by space. Used for identification."""
@@ -299,6 +317,8 @@ class Blockchain:
     BLOCK_INITIAL_REWARD = 727
     BLOCK_REWARD_SUM = BLOCK_REWARD_SEASON * BLOCK_INITIAL_REWARD * 2 # 76422240
 
+    GENESIS_MESSAGE = r"""Dreamveil - The coolest blockchain, 12th grade cyber project."""
+
     # Transaction record tree
     # Transaction signature: (spent, value)
     def __init__(self, chain=[], unspent_transactions_tree=None):
@@ -310,10 +330,12 @@ class Blockchain:
         :returns: Did block chain (boolean)"""
 
         if len(self.chain) > 0:
+            # Block does not continue our chain
             if block.previous_block_hash != self.chain[-1].block_hash:
-                # Block does not directly chain
-                # TODO: Check/show that block(x+1) cannot practically arrive before block(x)
                 return False
+
+        if not self.verify_block_difficulty(block):
+            return False
 
         if not self.verify_block(block, len(self.chain)):
             return False
@@ -336,12 +358,13 @@ class Blockchain:
 
         return True
 
-    def verify_block(self, block, block_height):
+    def verify_block(self, block:Block, block_height:int):
         """
         This function verifies that the sender of each transaction in the block has the resources to carry it out.
         Transactions do not recognize other transactions in the same block to prevent order frauding
         """
 
+        assert block_height >= 0
         block_fees = to_decimal(0)
         miner_reward_transaction = None
         # For each transaction in the block
@@ -370,6 +393,13 @@ class Blockchain:
             print("Block rejected in verify_block (Miner transaction does not evaluate to the correct amount)")
             return False
         return True
+
+    def verify_block_difficulty(self, block:Block):
+        # TODO: Currently using a PLACEHOLDER static difficulty!!!
+        if block.calculate_difficulty() >= 2**10:
+            return True
+        else:
+            return False
 
     def dumps(self):
         information = [self.chain, self.unspent_transactions_tree.dumps()]

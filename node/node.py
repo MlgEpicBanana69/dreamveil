@@ -1,3 +1,4 @@
+from concurrent.futures import thread
 import dreamveil
 
 import configparser
@@ -12,6 +13,8 @@ from Crypto.PublicKey import RSA
 
 import socket
 import threading
+
+from node.dreamveil import Blockchain
 
 # TODO TASKS (AMOGUS):
 # Implement transaction pool storing (DONE)
@@ -40,7 +43,7 @@ class Server:
     PEER_STATUS_OFFLINE = "OFFLINE"
     PEER_STATUS_UNKNOWN = "UNKNOWN"
 
-    def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner, port=22727, max_peer_amount=150):
+    def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner:bool, miner_msg:str="", port:int=22727, max_peer_amount:int=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -50,12 +53,17 @@ class Server:
         self.address = address
         self.port = port
         self.max_peer_amount = max_peer_amount
-        self.is_miner = is_miner
         self.socket = None
         self.blockchain = blockchain
         self.peers = {}
         self.peer_pool = peer_pool
         self.transaction_pool = transaction_pool
+        self.is_miner = is_miner
+        if len(self.blockchain.chain) == 0:
+            self.miner_msg = dreamveil.Blockchain.GENESIS_MESSAGE
+        else:
+            self.miner_msg = miner_msg
+
         self.closed = False
         self.miner_thread = threading.Thread(target=self.miner)
         self.seeker_thread = threading.Thread(target=self.seeker)
@@ -170,22 +178,41 @@ class Server:
 
     def miner(self):
         # TODO: Properly and fully implement
-        transaction_pool_len = len(self.transaction_pool)
+        transaction_pool_len = None
         my_address = dreamveil.key_to_address(self.host_keys.public_key())
         while not self.closed:
-            # Refresh the mined block when new 
+            # Refresh the currently mined block when a new transaction is added to the pool
+            # Also refresh the block once our top block changes (We chained a block.)
+            # this is on the account that the newly chained block will remove the used transactions in transaction_pool
             if len(self.transaction_pool) != transaction_pool_len:
+                transaction_pool_len = len(self.transaction_pool)
                 mined_block = dreamveil.Block(self.blockchain.chain[-1].block_hash, [], 0, "")
-                block_reward = dreamveil.to_decimal(self.blockchain.calculate_block_reward(len(self.blockchain.chain) + 1))
+                block_reward = dreamveil.to_decimal(self.blockchain.calculate_block_reward(len(self.blockchain.chain)))
                 for pool_transaction in self.transaction_pool:
                     try:
                         block_reward += pool_transaction.get_miner_fee()
                         mined_block.add_transaction(pool_transaction)
+                        if not dreamveil.Block.verify_transactions(mined_block.transactions) or self.blockchain.verify_block(mined_block, len(self.blockchain.chain)):
+                            mined_block.remove_transaction(pool_transaction)
                     except ValueError:
                         break
-                miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "").sign(self.host_keys)
+                miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": block_reward}, {my_address: block_reward}, self.miner_msg, "", "").sign(self.host_keys)
                 mined_block.add_transaction(miner_reward_transaction)
 
+            if self.blockchain.verify_block_difficulty(mined_block):
+                if self.blockchain.chain_block(mined_block):
+                    print(f"### SUCCESFULY MINED AND CHAINED BLOCK {mined_block.block_hash}")
+                    if len(self.blockchain.chain) == 1:
+                        self.miner_msg = ""
+                else:
+                    print(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
+                    with open(APPLICATION_PATH + f"POWfailed\\{mined_block.block_hash}.json.old", "w", encoding="utf-8") as backup_file:
+                        backup_file.write(mined_block.dumps())
+                    print(f"### pausing miner thread for 30 seconds")
+                    time.sleep(30)
+                    mined_block.mine()
+            else:
+                mined_block.mine()
 
 class Connection:
     COMMAND_SIZE = 6
@@ -340,14 +367,6 @@ class Connection:
             print(log_str)
             return False
 
-    def close(self):
-        self.closed = True
-        self.socket.close()
-
-        print(f"### Closed connection with {self.address}")
-
-        del Server.singleton.peers[self.address]
-
     def send(self, message:str):
         assert len(message) <= Connection.MAX_MESSAGE_SIZE
 
@@ -466,6 +485,14 @@ class Connection:
                 Server.singleton.blockchain = new_blockchain
         print(f"### With ({self.address}) finished syncing new chain at length {Server.singleton.blockchain.chain} (old: {my_chain_len})")
     #endregion
+
+    def close(self):
+        self.closed = True
+        self.socket.close()
+
+        print(f"### Closed connection with {self.address}")
+
+        del Server.singleton.peers[self.address]
 
 def load_state():
     if not os.path.isdir(APPLICATION_PATH + "state"):
