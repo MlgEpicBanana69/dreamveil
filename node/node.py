@@ -38,12 +38,10 @@ APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 class Server:
     singleton = None
     PEER_STATUS_CONVERSED = "CONVERSED"
-    PEER_STATUS_DEPRECATED = "DEPRECATED"
+    PEER_STATUS_OFFLINE = "OFFLINE"
     PEER_STATUS_UNKNOWN = "UNKNOWN"
 
-    RSA.RsaKey().public
-
-    def __init__(self, version:str, host_keys:RSA.RsaKey,  blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, is_miner, port=22727, max_peer_amount=150):
+    def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:dict, address:str, is_miner, port=22727, max_peer_amount=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -71,9 +69,9 @@ class Server:
         peer_options = []
         deprecated_peer_options = []
         for peer, status in self.peer_pool.items():
-            if status != Server.PEER_STATUS_DEPRECATED and peer not in self.peers.keys():
+            if status != Server.PEER_STATUS_OFFLINE and peer not in self.peers.keys():
                 peer_options.append(peer)
-            elif status == Server.PEER_STATUS_DEPRECATED and peer not in self.peers.keys():
+            elif status == Server.PEER_STATUS_OFFLINE and peer not in self.peers.keys():
                 deprecated_peer_options.append(peer)
         if len(peer_options) > 0:
             output = random.choice(peer_options)
@@ -110,8 +108,8 @@ class Server:
                     connection_result = self.connect(new_peer)
                     if connection_result is None:
                         # TODO: Define peer status system
-                        if peer_pool[new_peer] != Server.PEER_STATUS_DEPRECATED:
-                            peer_pool[new_peer] = Server.PEER_STATUS_DEPRECATED
+                        if peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
+                            peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
                             print(f"### Marked {new_peer} as DEPRECATED")
                     else:
                         peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
@@ -161,12 +159,6 @@ class Server:
 
         self.closed = True
 
-    def broadcast(self, message, exclusions=[]):
-        #TODO: Check if this is needed anymore
-        for peer_addr, peer in self.peers.items():
-            if peer_addr not in exclusions:
-                peer.send(message)
-
     def add_to_transaction_pool(self, transaction:dreamveil.Transaction):
         transaction_efficiency = str(dreamveil.to_decimal(transaction.miner_fee) / dreamveil.to_decimal(len(transaction.dumps())))
         if transaction_efficiency not in self.transaction_pool:
@@ -184,7 +176,11 @@ class Server:
     def miner(self):
         # TODO: Properly and fully implement
         mined_block = dreamveil.Block(self.blockchain.chain[-1].block_hash, [], 0, "")
-       # miner_reward_transaction = dreamveil.Transaction("", 0, [self.host_keys.], [], "", "", "").sign()
+        block_reward = str(dreamveil.to_decimal(self.blockchain.calculate_block_reward(len(self.blockchain.chain) + 1)))
+        my_address = dreamveil.key_to_address(self.host_keys.public_key())
+        miner_reward_transaction = dreamveil.Transaction("", 0, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "")
+        mined_block.add_transaction(miner_reward_transaction)
+
 
 class Connection:
     COMMAND_SIZE = 6

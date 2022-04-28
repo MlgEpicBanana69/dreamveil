@@ -1,9 +1,9 @@
 from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
+import base64
 import secrets
 import decimal
 import json
-import copy
 
 import data_structures
 
@@ -24,6 +24,20 @@ def to_decimal(number:str):
             if output.is_finite():
                 return output
     raise decimal.InvalidOperation(f"Invalid number given")
+
+def address_to_key(address:str):
+    """
+    Converts an address str to RSA key
+    :returns: RSA key object
+    """
+    return RSA.import_key(base64.b64decode(address.encode()))
+
+def key_to_address(rsa_key:RSA.RsaKey):
+    """
+    Converts an rsa key to address
+    :returns: str address
+    """
+    return base64.b64encode(rsa_key.export_key()).decoded()
 
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
@@ -51,7 +65,7 @@ class Transaction:
             :param: p_key: The private key related to the sender's wallet
             :returns: The produced digital signature"""
         # Generate and set a random Nonce
-        self.nonce = hex(secrets.randbits(256))[2::]
+        self.nonce = secrets.token_hex(32)
         # Generate the transaction hash (Including the nonce)
         # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
         transaction_hash = SHA256.new(self.get_contents().encode()).hexdigest()
@@ -144,7 +158,7 @@ class Transaction:
 class Block:
     MAX_BLOCK_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
-    def __init__(self, previous_block_hash:str, transactions:list, nonce:int, block_hash:str):
+    def __init__(self, previous_block_hash:str, transactions:list, nonce:str, block_hash:str):
         assert type(previous_block_hash) == str and type(transactions) == list and type(nonce) == int and type(block_hash) == str
 
         self.previous_block_hash = previous_block_hash
@@ -156,11 +170,9 @@ class Block:
         return self.dumps()
 
     def add_transaction(self, transaction:Transaction):
-        self.nonce = 0
         self.transactions.append(transaction)
 
     def remove_transaction(self, transaction:Transaction):
-        self.nonce = 0
         self.transactions.remove(transaction)
 
     def get_contents(self):
@@ -354,6 +366,9 @@ class Blockchain:
         a0 = 727 * 52560 = 38211120
         sum of geometric series = 2 * a0 = 76422240
         Total currency amount 76422240
+
+        :param Height: Height of the block
+        :returns: decimal.Decimal block_reward
         """
         q = to_decimal(0.5)
         n = height // Blockchain.BLOCK_REWARD_SEASON
