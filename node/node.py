@@ -170,23 +170,22 @@ class Server:
 
     def miner(self):
         # TODO: Properly and fully implement
-        mined_block = dreamveil.Block(self.blockchain.chain[-1].block_hash, [], 0, "")
-        block_reward = str(dreamveil.to_decimal(self.blockchain.calculate_block_reward(len(self.blockchain.chain) + 1)))
-        my_address = dreamveil.key_to_address(self.host_keys.public_key())
-        miner_reward_transaction = dreamveil.Transaction("", 0, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "")
-        mined_block.add_transaction(miner_reward_transaction)
-
         transaction_pool_len = len(self.transaction_pool)
+        my_address = dreamveil.key_to_address(self.host_keys.public_key())
         while not self.closed:
+            # Refresh the mined block when new 
             if len(self.transaction_pool) != transaction_pool_len:
+                mined_block = dreamveil.Block(self.blockchain.chain[-1].block_hash, [], 0, "")
+                block_reward = dreamveil.to_decimal(self.blockchain.calculate_block_reward(len(self.blockchain.chain) + 1))
                 for pool_transaction in self.transaction_pool:
-                    if pool_transaction not in mined_block.transactions:
-                        try:
-                            mined_block.add_transaction(pool_transaction)
-                        except ValueError:
-                            break
-                block_reward = mined_block.reward
-                miner_reward_transaction = dreamveil.Transaction("", 0, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "")
+                    try:
+                        block_reward += pool_transaction.get_miner_fee()
+                        mined_block.add_transaction(pool_transaction)
+                    except ValueError:
+                        break
+                miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "").sign(self.host_keys)
+                mined_block.add_transaction(miner_reward_transaction)
+
 
 class Connection:
     COMMAND_SIZE = 6

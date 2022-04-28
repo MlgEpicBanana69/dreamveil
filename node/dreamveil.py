@@ -134,12 +134,12 @@ class Transaction:
             assert type(information) == list
             assert len(information) == 6
 
-            assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
+            assert type(information[0]) == str and type(address_to_key(information[0])) == RSA.RsaKey
             assert type(information[1]) == dict
             assert type(information[2]) == dict
-            assert type(information[3]) == str and len(information[4]) <= 222
-            assert type(information[4]) == str and len(information[5]) == 64
-            assert type(information[5]) == str and len(information[0]) == 64 and int(information[0], base=16)
+            assert type(information[3]) == str and len(information[3]) <= 222
+            assert type(information[4]) == str and len(information[4]) == 32
+            assert type(information[5]) == str and type(address_to_key(information[5])) == RSA.RsaKey
 
             transaction_object = Transaction(*information)
             assert transaction_object.verify_io()
@@ -212,11 +212,11 @@ class Block:
             information = json.loads(json_str)
             assert type(information) == list
             assert len(information) == 4
-            assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
 
+            assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
             #region information[1]
             # Read and interpret each transaction object seperately
-            assert len(information[1]) > 0 and type(information[1]) == list
+            assert type(information[1]) == list and len(information[1]) > 0
             transactions = []
             # TODO: Debug this bs
             for transaction in information[1]:
@@ -237,15 +237,12 @@ class Block:
 
             information[1] = transactions
             #endregion
-
-            # Nonce
             assert information[2] >= 0
-
             assert type(information[3]) == str and len(information[3]) == 64 and int(information[3], base=16)
+
             output = Block(*information)
             assert output.verify_hash()
             assert output.verify_block_has_reward()
-
             return output
         except Exception as err:
             print("Block rejected!")
@@ -288,7 +285,7 @@ class Block:
 
     def calculate_difficulty(self):
         difficulty = 1
-        for b in self.block_hash:
+        for b in self.block_hash[::-1]:
             if not b:
                 difficulty *= 2
             else:
