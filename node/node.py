@@ -1,4 +1,3 @@
-from concurrent.futures import thread
 import dreamveil
 
 import configparser
