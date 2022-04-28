@@ -34,6 +34,7 @@ from node.dreamveil import Blockchain
 #   Does not attempt to solve any blocks
 
 # TODO: Shifting prefer longest chain to prefer heaviest chain CRITICAL!!!
+# TODO: Delete used transactions from transaction_pool once a block is chained
 
 APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
@@ -204,6 +205,11 @@ class Server:
                     print(f"### SUCCESFULY MINED AND CHAINED BLOCK {mined_block.block_hash}")
                     if len(self.blockchain.chain) == 1:
                         self.miner_msg = ""
+
+                    for transaction in mined_block.transactions:
+                        if "BLOCK" not in transaction.inputs:
+                            if transaction in self.transaction_pool:
+                                self.transaction_pool.remove(transaction)
                 else:
                     print(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
                     with open(APPLICATION_PATH + f"POWfailed\\{mined_block.block_hash}.json.old", "w", encoding="utf-8") as backup_file:
@@ -301,7 +307,7 @@ class Connection:
                     except (ValueError, AssertionError):
                         self.send("True")
                         new_tx = dreamveil.Transaction.loads(self.recv())
-                        if new_tx.signature == tx_signature:
+                        if new_tx.signature == tx_signature and "BLOCK" not in new_tx.inputs:
                             Server.singleton.add_to_transaction_pool(new_tx)
                             for peer_addr, peer_connection in Server.singleton.peers.items():
                                 if peer_addr != self.address:
@@ -318,11 +324,15 @@ class Connection:
                         self.send("True")
                         new_bk = dreamveil.Block.loads(self.recv())
                         if new_bk.block_hash == bk_hash:
-                            assert Server.singleton.blockchain.chain_block(new_bk)
-                            for peer_addr, peer_connection in Server.singleton.peers.items():
-                                if peer_addr != self.address:
-                                    action_thread = threading.Thread(target=peer_connection.SENDBK, args=(new_bk,))
-                                    action_thread.start()
+                            if Server.singleton.blockchain.chain_block(new_bk):
+                                for transaction in new_bk.transactions:
+                                    if "BLOCK" not in transaction.inputs:
+                                        if transaction in self.transaction_pool:
+                                            self.transaction_pool.remove(transaction)
+                                for peer_addr, peer_connection in Server.singleton.peers.items():
+                                    if peer_addr != self.address:
+                                        action_thread = threading.Thread(target=peer_connection.SENDBK, args=(new_bk,))
+                                        action_thread.start()
                         else:
                             self.close()
                             return
