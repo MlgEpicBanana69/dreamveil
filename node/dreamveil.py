@@ -42,14 +42,13 @@ def key_to_address(rsa_key:RSA.RsaKey):
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
-    def __init__(self, sender:str, miner_fee:str, inputs:dict, outputs:dict, message:str, nonce:str, signature:str):
-        assert type(sender) == str and type(miner_fee) == str
+    def __init__(self, sender:str, inputs:dict, outputs:dict, message:str, nonce:str, signature:str):
+        assert type(sender) == str
         assert type(inputs) == dict and type(outputs) == dict
         assert type(message) == str
         assert type(nonce) == str and type(signature) == str
 
         self.sender = sender
-        self.miner_fee = to_decimal(miner_fee)
         self.inputs = inputs
         self.outputs = outputs
         self.message = message
@@ -93,27 +92,31 @@ class Transaction:
         try:
             if len(self.inputs) == 0 or len(self.outputs) == 0:
                 return False
-            #TODO: Debug
+
+            has_miner_fee = False
+
             inputs_sum = 0
-            for input_key in self.inputs.keys():
-                input_value = to_decimal(self.inputs[input_key])
+            for input_key, input_value in self.inputs.items():
+                input_value = to_decimal(input_value)
                 if type(input_key) != str:
                     return False
                 if len(input_key) != 64:
-                    if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK" and to_decimal(self.miner_fee) == 0):
+                    if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK"):
                         return False
                 if input_value < 0:
                     return False
                 inputs_sum += input_value
 
-            outputs_sum = self.miner_fee
-            for output_key in self.outputs.keys():
-                output_value = to_decimal(self.outputs[output_key])
-                assert output_value.is_finite()
+            outputs_sum = 0
+            for output_key, output_value in self.outputs.keys():
+                output_value = to_decimal(output_value)
                 if type(output_key) != str:
                     return False
                 if len(output_key) != 64:
-                    return False
+                    if not has_miner_fee and output_key == "MINER":
+                        has_miner_fee = True
+                    else:
+                        return False
                 if input_value < 0:
                     return False
                 outputs_sum += output_value
@@ -129,15 +132,14 @@ class Transaction:
             assert len(json_str) < Transaction.MAX_TRANSACTION_SIZE
             information = json.loads(json_str)
             assert type(information) == list
-            assert len(information) == 7
+            assert len(information) == 6
 
             assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
-            assert type(information[1]) == str and to_decimal(information[1]) >= 0
+            assert type(information[1]) == dict
             assert type(information[2]) == dict
-            assert type(information[3]) == dict
-            assert type(information[4]) == str and len(information[4]) <= 222
-            assert type(information[5]) == str and len(information[5]) == 64
-            assert type(information[6]) == str and len(information[0]) == 64 and int(information[0], base=16)
+            assert type(information[3]) == str and len(information[4]) <= 222
+            assert type(information[4]) == str and len(information[5]) == 64
+            assert type(information[5]) == str and len(information[0]) == 64 and int(information[0], base=16)
 
             transaction_object = Transaction(*information)
             assert transaction_object.verify_io()
@@ -148,15 +150,25 @@ class Transaction:
             print("Transaction rejected!")
 
     def dumps(self):
-        information = [self.sender, str(self.miner_fee), self.inputs, self.outputs, self.message, self.nonce, self.signature]
+        information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
         return repr(information)
 
     def get_contents(self):
-        information = [self.sender, str(self.miner_fee), self.inputs, self.outputs, self.message, self.nonce]
+        information = [self.sender, self.inputs, self.outputs, self.message, self.nonce]
         return repr(information)
 
     def calculate_efficiency(self):
-        return to_decimal(self.miner_fee) / to_decimal(len(self.dumps()))
+        return self.get_miner_fee() / to_decimal(len(self.dumps()))
+
+    def get_miner_fee(self):
+        """
+        Gets the miner fee value.
+        :returns: decimal.Decimal miner_fee. If not found, defaults to 0.
+        """
+        for output_key, output_value in self.outputs.items():
+            if output_key == "MINER":
+                return to_decimal(output_value)
+        return to_decimal(0)
 
 class Block:
     MAX_SIZE = 2097152 # Maximum block size in bytes (2MB)
@@ -320,7 +332,7 @@ class Blockchain:
             # For each input the new transaction referenced
             for heavenly_principle_struck_transaction in transaction.inputs: # All is lost to time (and use) (?)
                 # Find the node that stores the status of the input-referenced transaction
-                intree_node = self.unspent_transactions_tree.find(self.unspent_transactions_tree.tree, heavenly_principle_struck_transaction)
+                intree_node = self.unspent_transactions_tree.find(heavenly_principle_struck_transaction)
 
                 # We remove the transaction's output as it was spent
                 del intree_node[transaction.sender]
@@ -340,7 +352,7 @@ class Blockchain:
             # Go over all of the inputs referenced in the block.
             for input_source, input_amount in transaction.inputs.items():
                 if input_source != "BLOCK":
-                    transaction_node = self.unspent_transactions_tree.find(self.unspent_transactions_tree.tree, input_source)
+                    transaction_node = self.unspent_transactions_tree.find(input_source)
                     if input_source is None:
                         print("Block rejected in verify_block (referenced transaction does not exist)")
                         return False
@@ -352,7 +364,7 @@ class Blockchain:
                         return False
                 else:
                     miner_reward_transaction = transaction
-            block_fees += to_decimal(transaction.miner_fee)
+            block_fees += transaction.get_miner_fee()
 
         proposed_block_reward = to_decimal(0)
         for output in miner_reward_transaction.outputs.values():
@@ -391,8 +403,6 @@ class Blockchain:
         q = to_decimal(0.5)
         n = height // Blockchain.BLOCK_REWARD_SEASON
         block_reward = Blockchain.BLOCK_INITIAL_REWARD * q**n
-        for transaction in block_reward.transactions:
-            block_reward += transaction.miner_fee
         return to_decimal(block_reward)
 
 # debugging

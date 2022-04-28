@@ -188,12 +188,6 @@ class Server:
                             break
                 block_reward = mined_block.reward
                 miner_reward_transaction = dreamveil.Transaction("", 0, {"BLOCK": block_reward}, {my_address: block_reward}, "", "", "")
-            
-
-                
-
-
-
 
 class Connection:
     COMMAND_SIZE = 6
