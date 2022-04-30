@@ -133,8 +133,8 @@ class Server:
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
                 if peer_address[0] not in self.peers.keys():
-                    self.peers[peer_address[0]] = Connection(peer_socket, peer_address)
-                    print(f"### {peer_address} connected to node")
+                    Connection(peer_socket, peer_address[0])
+                    print(f"### {peer_address[0]} connected to node")
                 else:
                     peer_socket.close()
 
@@ -144,13 +144,10 @@ class Server:
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
                 new_peer = Connection(peer_socket, address)
-                self.peers[address] = new_peer
                 print(f"### Server connected to {address}")
                 return new_peer
             except TimeoutError:
                 print(f"!!! Failed to connect to {address}")
-                if address in self.peers:
-                    del self.peers[address]
                 return None
         else:
             print(f"!!! Failed to connect to {address}")
@@ -232,6 +229,7 @@ class Connection:
         self.lock = threading.Lock()
         self.peer_chain_mass = None
         self.peer_top_block_hash = None
+        Server.singleton.peers[address] = self
 
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
