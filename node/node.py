@@ -48,7 +48,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
-        self.difficulty_target = int(2**14) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**10) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
