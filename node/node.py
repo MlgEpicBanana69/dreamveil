@@ -246,13 +246,13 @@ class Connection:
             self.send(Server.singleton.version)
             peer_version = self.recv()
             assert peer_version == Server.singleton.version
-            self.send(str(Server.singleton.blockchain.mass))
+            self.send(f"{Server.singleton.blockchain.mass}")
             peer_chain_mass = self.recv()
             peer_chain_mass = int(peer_chain_mass)
-            assert peer_chain_mass > 0
-            self.peer_chain_mass == peer_chain_mass
+            assert peer_chain_mass >= 0
+            self.peer_chain_mass = peer_chain_mass
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
-            peers_to_share = random.sample(Server.singleton.peer_pool.keys(), 100)
+            peers_to_share = random.sample(list(Server.singleton.peer_pool.keys()), 100)
             self.send(" ".join(peers_to_share))
             newly_given_peers = self.recv().split(' ')
             assert len(newly_given_peers) <= 100
