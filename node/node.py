@@ -34,8 +34,6 @@ from node.dreamveil import Blockchain
 #   Does not try to form a block using transactions
 #   Does not attempt to solve any blocks
 
-# TODO: Shifting prefer longest chain to prefer heaviest chain CRITICAL!!!
-
 APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
 class Server:
@@ -43,6 +41,7 @@ class Server:
     PEER_STATUS_CONVERSED = "CONVERSED"
     PEER_STATUS_OFFLINE = "OFFLINE"
     PEER_STATUS_UNKNOWN = "UNKNOWN"
+    TRUST_HEIGHT = 6
 
     def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner:bool, miner_msg:str="", port:int=22727, max_peer_amount:int=150):
         if Server.singleton is not None:
@@ -201,7 +200,7 @@ class Server:
                 miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": block_reward}, {my_address: block_reward}, self.miner_msg, "", "").sign(self.host_keys)
                 mined_block.add_transaction(miner_reward_transaction)
 
-            if Server.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
+            if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
                 if self.blockchain.chain_block(mined_block):
                     print(f"### SUCCESFULY MINED AND CHAINED BLOCK {mined_block.block_hash}")
                     if len(self.blockchain.chain) == 1:
@@ -219,17 +218,6 @@ class Server:
                     mined_block.mine()
             else:
                 mined_block.mine()
-    @staticmethod
-    def calculate_block_hash_difficulty(self, block_hash:str):
-        assert len(block_hash) == 64
-        binary_block_hash = bin(int(block_hash, base=16))[2::].zfill(256)
-        difficulty = 1
-        for b in binary_block_hash:
-            if b == '0':
-                difficulty *= 2
-            else:
-                break
-        return difficulty
 
 class Connection:
     COMMAND_SIZE = 6
@@ -241,7 +229,7 @@ class Connection:
         self.address = address
         self.closed = False
         self.lock = threading.Lock()
-        self.peer_chain_len = None
+        self.peer_chain_mass = None
         self.peer_top_block_hash = None
 
         self.thread = threading.Thread(target=self.run)
@@ -256,10 +244,10 @@ class Connection:
 
             argument = f"{Server.singleton.blockchain.chain[-1].get_header()} {len(Server.singleton.blockchain.chain)}"
             self.send(argument)
-            peer_chain_len, peer_top_block_hash = self.recv().split(' ')
-            peer_chain_len = int(peer_chain_len)
-            assert peer_chain_len > 0
-            self.peer_chain_len == peer_chain_len
+            peer_chain_mass, peer_top_block_hash = self.recv().split(' ')
+            peer_chain_mass = int(peer_chain_mass)
+            assert peer_chain_mass > 0
+            self.peer_chain_mass == peer_chain_mass
             self.peer_top_block_hash = peer_top_block_hash
 
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
@@ -329,17 +317,17 @@ class Connection:
                 case "SENDBK":
                     bk_prev_hash, bk_hash = param.split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
-                    self.peer_chain_len += 1
+                    self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
                     self.peer_top_block_hash = bk_hash
-                    if my_top_bk.block_hash == bk_prev_hash and Server.calculate_block_hash_difficulty(bk_hash) > Server.singleton.difficulty_target:
+                    if my_top_bk.block_hash == bk_prev_hash and dreamveil.Block.calculate_block_hash_difficulty(bk_hash) >= Server.singleton.difficulty_target:
                         self.send("True")
                         new_bk = dreamveil.Block.loads(self.recv())
                         if new_bk.block_hash == bk_hash:
                             if Server.singleton.blockchain.chain_block(new_bk):
                                 for transaction in new_bk.transactions:
                                     if "BLOCK" not in transaction.inputs:
-                                        if transaction in self.transaction_pool:
-                                            self.transaction_pool.remove(transaction)
+                                        if transaction in Server.singleton.transaction_pool:
+                                            Server.singleton.transaction_pool.remove(transaction)
                                 for peer_addr, peer_connection in Server.singleton.peers.items():
                                     if peer_addr != self.address:
                                         action_thread = threading.Thread(target=peer_connection.SENDBK, args=(new_bk,))
@@ -350,30 +338,36 @@ class Connection:
                     else:
                         self.send("False")
                         #region Check to see if peer's chain is significantly larger than the current one used
-                        if self.peer_chain_len - len(Server.singleton.blockchain.chain) >= dreamveil.Blockchain.TRUST_HEIGHT:
-                            print(f"### Noticed that {self.address} uses a significantly larger chain (dHchain = {self.peer_chain_len - len(Server.singleton.blockchain.chain)})... Starting to sync with it")
+                        if self.peer_chain_mass >= Server.singleton.blockchain.mass + Server.TRUST_HEIGHT * Server.singleton.difficulty_target:
+                            print(f"### Noticed that {self.address} uses a significantly larger chain (dM-chain = {self.peer_chain_mass - Server.singleton.blockchain.mass} Starting to sync with it")
                             chnsyn_thread = threading.Thread(target=self.CHNSYN)
                             chnsyn_thread.start()
                 case "CHNSYN":
-                    peer_chain_len, peer_top_block_hash = self.recv().split(' ')
+                    peer_chain_mass, peer_chain_len, peer_top_block_hash = self.recv().split(' ')
+                    peer_chain_mass = int(peer_chain_mass)
                     peer_chain_len = int(peer_chain_len)
-                    assert peer_chain_len > 0
-                    self.peer_chain_len = peer_chain_len
+                    assert peer_chain_mass >= 0 and peer_chain_len >= 0
+                    self.peer_chain_mass = peer_chain_mass
                     self.peer_top_block_hash = peer_top_block_hash
 
-                    my_chain_len = len(Server.singleton.blockchain.chain)
-                    self.send(f"{my_chain_len} {Server.singleton.blockchain.chain[-1].block_hash()}")
+                    my_chain_mass = Server.singleton.blockchain.mass
+                    self.send(f"{my_chain_mass} {Server.singleton.blockchain.chain[-1].block_hash}")
 
                     if self.recv() == "True":
                         hash_batches_sent = 0
                         while True:
                             hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[:peer_chain_len:][::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
-                            self.send(" ".join(hash_batch))
-                            split_index = self.recv()
-                            if split_index != "continue":
-                                break
+                            if len(hash_batch) > 0:
+                                self.send(" ".join(hash_batch))
+                                split_index = self.recv()
+                                if split_index != "continue":
+                                    break
+                            else:
+                                print(f"!!! hash_batch came out empty while helping {self.address} to sync!")
+                                self.close()
+                                return
                         split_index = int(split_index)
-                        assert split_index >= 0 and split_index < my_chain_len
+                        assert split_index >= 0 and split_index < len(Server.singleton.blockchain.chain)
                         blocks_sent = 0
                         for block in Server.singleton.blockchain.chain[split_index::]:
                             self.send(block.dumps())
@@ -446,16 +440,17 @@ class Connection:
     @connection_command
     def CHNSYN(self):
         # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
-        my_chain_mass = len(Server.singleton.blockchain.chain)
-        self.send(f"{my_chain_len} {Server.singleton.blockchain.chain[-1].block_hash()}")
+        my_chain_mass = Server.singleton.blockchain.mass
+        my_chain_len = len(Server.singleton.blockchain.chain)
+        self.send(f"{my_chain_mass} {Server.singleton.blockchain.chain[-1].block_hash}")
 
         peer_chain_mass, peer_top_block_hash = self.recv().split(' ')
         peer_chain_mass = int(peer_chain_mass)
-        assert peer_chain_mass > 0 and math.log(peer_chain_mass, 2) % 1 == 0
+        assert peer_chain_mass > 0
         self.peer_chain_mass = peer_chain_mass
         self.peer_top_block_hash = peer_top_block_hash
 
-        if peer_chain_mass >= my_chain_:
+        if peer_chain_mass < my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
             self.send("False")
             return
         self.send("True")
@@ -483,42 +478,45 @@ class Connection:
             new_blockchain = dreamveil.Blockchain()
             for i in range(split_index):
                 new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
+        else:
+            new_blockchain = Server.singleton.blockchain
         self.send(str(split_index))
 
         # Download all the blocks mentioned in the inventory list from the peer
-        for i in range(peer_chain_len - my_chain_len + len(inventory)):
+        while new_blockchain.mass < peer_chain_mass:
             new_bk = dreamveil.Block.loads(self.recv())
-            if form_new_chain:
-                chain_result = new_blockchain.chain_block(new_bk)
-            else:
-                chain_result = Server.singleton.blockchain.chain_block(new_bk)
+            chain_result = new_blockchain.chain_block(new_bk)
 
             if chain_result:
                 for transaction in new_bk.transactions:
                     if "BLOCK" not in transaction.inputs:
-                        if transaction in self.transaction_pool:
-                            self.transaction_pool.remove(transaction)
+                        if transaction in Server.singleton.transaction_pool:
+                            Server.singleton.transaction_pool.remove(transaction)
             else:
                 print(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
-                if form_new_chain:
+                if form_new_chain and not new_blockchain is Server.singleton.blockchain:
                     del new_blockchain
                 self.close()
                 return
             self.send("continue")
 
-        if form_new_chain:
             # If the given blockchain is indeed larger than the current blockchain used
-            if len(new_blockchain.chain) > len(Server.singleton.blockchain.chain):
+            if new_blockchain.mass == peer_chain_mass and form_new_chain:
                 # We swap the blockchain objects to the new larger one.
                 Server.singleton.blockchain = new_blockchain
-        print(f"### With ({self.address}) finished syncing new chain at length {Server.singleton.blockchain.chain} (old: {my_chain_len})")
+            else:
+                print(f"!!! Given blockchain mass is not the same as specified by ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
+                if form_new_chain and not new_blockchain is Server.singleton.blockchain:
+                    del new_blockchain
+                self.close()
+        print(f"### With ({self.address}) finished syncing new chain with mass {Server.singleton.blockchain.chain.mass} and length {len(Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
     #endregion
 
     def close(self):
         self.closed = True
         self.socket.close()
 
-        print(f"### Closed connection with {self.address}")
+        print(f"### Terminated connection with {self.address}")
 
         del Server.singleton.peers[self.address]
 

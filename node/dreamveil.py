@@ -219,6 +219,18 @@ class Block:
         return self.block_hash
 
     @staticmethod
+    def calculate_block_hash_difficulty(block_hash:str):
+        assert len(block_hash) == 64
+        binary_block_hash = bin(int(block_hash, base=16))[2::].zfill(256)
+        difficulty = 1
+        for b in binary_block_hash:
+            if b == '0':
+                difficulty *= 2
+            else:
+                break
+        return difficulty
+
+    @staticmethod
     def loads(json_str):
         # TODO: DEBUG THIS
         try:
@@ -330,6 +342,9 @@ class Blockchain:
 
         # Add the newly accepted block into the blockchain
         self.chain.append(block)
+
+        # Update the mass of the chain
+        self.mass += Block.calculate_block_hash_difficulty(block.block_hash)
 
         # For each now accepted transaction in the newly trusted block
         for transaction in self.chain[-1].transaction:
