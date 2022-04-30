@@ -60,6 +60,7 @@ class Server:
         self.peer_pool = peer_pool
         self.transaction_pool = transaction_pool
         self.is_miner = is_miner
+        self.connection_lock = threading.Lock()
         if len(self.blockchain.chain) == 0:
             self.miner_msg = dreamveil.Blockchain.GENESIS_MESSAGE
         else:
@@ -74,7 +75,6 @@ class Server:
         self.run_thread.start()
 
     def roll_peer(self):
-        Connection.CONNECTION_INIT_LOCK.acquire()
         peer_options = []
         offline_peer_options = []
         for peer, status in self.peer_pool.items():
@@ -89,7 +89,6 @@ class Server:
             output = random.choice(offline_peer_options)
         else:
             output = None
-        Connection.CONNECTION_INIT_LOCK.release()
         return output
 
     def run(self):
@@ -112,6 +111,7 @@ class Server:
         while not self.closed:
             # Once connection amount is too low, seek connections if possible.
             while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
+                self.connection_lock.acquire()
                 new_peer = self.roll_peer()
                 if new_peer is not None:
                     connection_result = self.connect(new_peer)
@@ -122,6 +122,7 @@ class Server:
                             print(f"### Marked {new_peer} as OFFLINE")
                     else:
                         peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
+                self.connection_lock.release()
 
     def accepter(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -133,13 +134,15 @@ class Server:
             # Do not accept new connections once peer count exceeds maximum allowed
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
+                self.connection_lock.acquire()
                 Connection(peer_socket, peer_address[0])
                 print(f"### {peer_address[0]} connected to node")
+                self.connection_lock.release()
 
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
+            peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
-                peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
             except TimeoutError:
                 print(f"!!! Failed to connect to {address}")
@@ -219,10 +222,8 @@ class Connection:
     COMMAND_SIZE = 6
     HEADER_LEN = len(str(dreamveil.Block.MAX_SIZE))
     MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_SIZE
-    CONNECTION_INIT_LOCK = threading.Lock()
 
     def __init__(self, socket, address):
-        Connection.CONNECTION_INIT_LOCK.acquire()
         self.started = False
         self.socket = socket
         self.address = address
@@ -238,7 +239,6 @@ class Connection:
 
         self.started = True
         self.thread = threading.Thread(target=self.run)
-        Connection.CONNECTION_INIT_LOCK.release()
         self.thread.start()
 
     def setup(self):
