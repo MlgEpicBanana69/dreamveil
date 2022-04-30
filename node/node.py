@@ -518,7 +518,8 @@ class Connection:
 
         print(f"### Terminated connection with {self.address}")
 
-        del Server.singleton.peers[self.address]
+        if self.address in Server.singleton.peers:
+            del Server.singleton.peers[self.address]
 
 def exit_handler():
     user_file.close()
