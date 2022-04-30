@@ -132,23 +132,20 @@ class Server:
             # Do not accept new connections once peer count exceeds maximum allowed
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
-                if peer_address[0] not in self.peers.keys():
-                    Connection(peer_socket, peer_address[0])
-                    print(f"### {peer_address[0]} connected to node")
-                else:
-                    peer_socket.close()
+                Connection(peer_socket, peer_address[0])
+                print(f"### {peer_address[0]} connected to node")
 
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
             try:
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((address, self.port))
-                new_peer = Connection(peer_socket, address)
-                print(f"### Server connected to {address}")
-                return new_peer
             except TimeoutError:
                 print(f"!!! Failed to connect to {address}")
                 return None
+            new_peer = Connection(peer_socket, address)
+            print(f"### Server connected to {address}")
+            return new_peer
         else:
             print(f"!!! Failed to connect to {address}")
             if len(self.peers) <= self.max_peer_amount:
