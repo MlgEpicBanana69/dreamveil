@@ -391,19 +391,22 @@ class Connection:
             raise Exception("Cannot send message. Connection is already closed.")
 
     def recv(self):
-        message = self.socket.recv(Connection.MAX_MESSAGE_SIZE).decode()
         try:
-            assert len(message) > 6
-            message_len = message[:Connection.HEADER_LEN]
-            assert len(message_len) == 6
-            message_len = int(message_len)
-            assert message_len > 0
-            message_contents = message[Connection.HEADER_LEN:message_len]
-        except (ValueError, AssertionError):
-            message_contents = message
-        print(f"### Recieved message from ({self.address}): {message}")
-        return message_contents
-
+            message = self.socket.recv(Connection.MAX_MESSAGE_SIZE).decode()
+            try:
+                assert len(message) > 6
+                message_len = message[:Connection.HEADER_LEN]
+                assert len(message_len) == 6
+                message_len = int(message_len)
+                assert message_len > 0
+                message_contents = message[Connection.HEADER_LEN:message_len]
+            except (ValueError, AssertionError):
+                message_contents = message
+            print(f"### Recieved message from ({self.address}): {message}")
+            return message_contents
+        except (ConnectionResetError):
+            if not self.closed:
+                self.close()
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
             try:
