@@ -1,5 +1,3 @@
-from itertools import chain
-from pkg_resources import ExtractionError
 import dreamveil
 import dreamnail
 
@@ -592,7 +590,7 @@ while True:
             user_file_contents = user_file.read()
             host_keys = [RSA.import_key(key) for key in json.loads(dreamnail.decrypt(password, user_file_contents).decode())]
             break
-        except (ExtractionError, json.JSONDecodeError):
+        except (ValueError, json.JSONDecodeError):
             print("Invalid password!")
 
 

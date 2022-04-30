@@ -1,11 +1,9 @@
 import secrets
 
-from getpass import getpass
 from Crypto.Random import get_random_bytes
 from Crypto.Hash import SHA256, HMAC
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
-from pkg_resources import ExtractionError
 
 def encrypt(passphrase:str, pt:str):
     """
@@ -44,7 +42,7 @@ def decrypt(passphrase:str, ct:bytes):
     encrypted_pt = ct[56::]
     mac = HMAC.new(expansion[16::], salt + nonce + encrypted_pt, digestmod=SHA256)
     if not secrets.compare_digest(mac.digest(), proposed_mac):
-        raise ExtractionError("Incorrect passphrase or invalid message")
+        raise ValueError("Incorrect passphrase or invalid message")
 
     pt = AES.new(key=expansion[:16:], mode=AES.MODE_CTR, nonce=nonce).decrypt(encrypted_pt)
     return pt
