@@ -402,7 +402,7 @@ class Connection:
             assert message_len > 0
             message_contents = message[Connection.HEADER_LEN:message_len]
         except (ValueError, AssertionError):
-            pass
+            message_contents = message
         print(f"### Recieved message from ({self.address}): {message}")
         return message_contents
 
