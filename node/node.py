@@ -229,7 +229,11 @@ class Connection:
         self.lock = threading.Lock()
         self.peer_chain_mass = None
         self.peer_top_block_hash = None
-        Server.singleton.peers[address] = self
+
+        if address not in Server.singleton.peers:
+            Server.singleton.peers[address] = self
+        else:
+            self.close()
 
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
@@ -407,6 +411,7 @@ class Connection:
         except (ConnectionResetError):
             if not self.closed:
                 self.close()
+
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
             try:
@@ -521,6 +526,8 @@ class Connection:
 
         if self.address in Server.singleton.peers:
             del Server.singleton.peers[self.address]
+
+        del self
 
 def exit_handler():
     user_file.close()
