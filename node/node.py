@@ -223,6 +223,7 @@ class Connection:
     MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_SIZE
 
     def __init__(self, socket, address):
+        self.started = False
         self.socket = socket
         self.address = address
         self.closed = False
@@ -235,6 +236,7 @@ class Connection:
         else:
             self.close()
 
+        self.started = True
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
 
@@ -408,7 +410,7 @@ class Connection:
                 message_contents = message
             print(f"### Recieved message from ({self.address}): {message}")
             return message_contents
-        except (ConnectionResetError):
+        except (ConnectionResetError, ConnectionAbortedError):
             if not self.closed:
                 self.close()
 
@@ -524,7 +526,7 @@ class Connection:
 
         print(f"### Terminated connection with {self.address}")
 
-        if self.address in Server.singleton.peers:
+        if self.address in Server.singleton.peers and self.started:
             del Server.singleton.peers[self.address]
 
         del self
