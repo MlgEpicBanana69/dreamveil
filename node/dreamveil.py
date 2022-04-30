@@ -436,7 +436,3 @@ class Blockchain:
         n = height // Blockchain.BLOCK_REWARD_SEASON
         block_reward = Blockchain.BLOCK_INITIAL_REWARD * q**n
         return to_decimal(block_reward)
-
-# debugging
-if __name__ == '__main__':
-    pass

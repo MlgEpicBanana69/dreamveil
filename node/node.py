@@ -48,7 +48,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
-        self.difficulty_target = int(2**10) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**12) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -393,17 +393,16 @@ class Connection:
             raise Exception("Cannot send message. Connection is already closed.")
 
     def recv(self):
-        message = self.socket.recv(Connection.MAX_MESSAGE_SIZE)
-        message_len = message[:Connection.HEADER_LEN]
+        message = self.socket.recv(Connection.MAX_MESSAGE_SIZE).decode()
         try:
-            message_len = message_len.lstrip("0")
+            assert len(message) > 6
+            message_len = message[:Connection.HEADER_LEN]
+            assert len(message_len) == 6
             message_len = int(message_len)
             assert message_len > 0
-        except (ValueError, AssertionError) as err:
-            print(f"### Recieved (recv) invalid message from ({self.address}): {message} || {err}")
-            # self.close()
-            return None
-        message_contents = message[Connection.HEADER_LEN:message_len]
+            message_contents = message[Connection.HEADER_LEN:message_len]
+        except (ValueError, AssertionError):
+            pass
         print(f"### Recieved message from ({self.address}): {message}")
         return message_contents
 
@@ -592,7 +591,6 @@ while True:
             break
         except (ValueError, json.JSONDecodeError):
             print("Invalid password!")
-
 
 server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True)
 
