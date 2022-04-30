@@ -1,4 +1,3 @@
-from concurrent.futures import thread
 import dreamveil
 
 import configparser
@@ -13,8 +12,6 @@ from Crypto.PublicKey import RSA
 
 import socket
 import threading
-
-from node.dreamveil import Blockchain
 
 # TODO TASKS (AMOGUS):
 # Implement transaction pool storing (DONE)
