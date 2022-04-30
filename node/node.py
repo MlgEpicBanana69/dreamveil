@@ -399,14 +399,16 @@ class Connection:
         try:
             message = self.socket.recv(Connection.MAX_MESSAGE_SIZE).decode()
             try:
-                assert len(message) > 6
+                assert len(message) > Connection.HEADER_LEN
                 message_len = message[:Connection.HEADER_LEN]
-                assert len(message_len) == 6
+                assert len(message_len) == Connection.HEADER_LEN
                 message_len = int(message_len)
                 assert message_len > 0
                 message_contents = message[Connection.HEADER_LEN:message_len]
             except (ValueError, AssertionError):
-                message_contents = message
+                print(f"Recieved invalid message from ({self.address})")
+                self.close()
+                return
             print(f"### Recieved message from ({self.address}): {message}")
             return message_contents
         except (ConnectionResetError, ConnectionAbortedError, OSError):
