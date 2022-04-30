@@ -74,6 +74,7 @@ class Server:
         self.run_thread.start()
 
     def roll_peer(self):
+        Connection.CONNECTION_INIT_LOCK.acquire()
         peer_options = []
         offline_peer_options = []
         for peer, status in self.peer_pool.items():
@@ -84,12 +85,12 @@ class Server:
         if len(peer_options) > 0:
             output = random.choice(peer_options)
             print(f"### Rolled {output} from peer options")
-            return output
         elif len(offline_peer_options) > 0:
             output = random.choice(offline_peer_options)
-            return output
         else:
-            return None
+            output = None
+        Connection.CONNECTION_INIT_LOCK.release()
+        return output
 
     def run(self):
         print("Starting server and assigning seeker and accepter threads")
@@ -408,7 +409,7 @@ class Connection:
                 message_contents = message
             print(f"### Recieved message from ({self.address}): {message}")
             return message_contents
-        except (ConnectionResetError, ConnectionAbortedError):
+        except (ConnectionResetError, ConnectionAbortedError, OSError):
             if not self.closed:
                 self.close()
 
