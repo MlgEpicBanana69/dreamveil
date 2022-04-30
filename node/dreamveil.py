@@ -301,17 +301,7 @@ class Block:
         self.nonce = secrets.token_hex(32)
         return self.hash_block()
 
-    def calculate_difficulty(self):
-        difficulty = 1
-        for b in self.block_hash[::-1]:
-            if not b:
-                difficulty *= 2
-            else:
-                break
-        return difficulty
-
 class Blockchain:
-    TRUST_HEIGHT = 6
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
     BLOCK_REWARD_SEASON = (0.5*365*24*60*60/AVERAGE_TIME_PER_BLOCK) # 52560
     BLOCK_INITIAL_REWARD = 727
@@ -321,8 +311,9 @@ class Blockchain:
 
     # Transaction record tree
     # Transaction signature: (spent, value)
-    def __init__(self, chain=[], unspent_transactions_tree=None):
+    def __init__(self, chain=[], mass=0, unspent_transactions_tree=None):
         self.chain = chain
+        self.mass = mass
         self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
 
     def chain_block(self, block:Block):
@@ -333,9 +324,6 @@ class Blockchain:
             # Block does not continue our chain
             if block.previous_block_hash != self.chain[-1].block_hash:
                 return False
-
-        if not self.verify_block_difficulty(block):
-            return False
 
         if not self.verify_block(block, len(self.chain)):
             return False
@@ -394,15 +382,8 @@ class Blockchain:
             return False
         return True
 
-    def verify_block_difficulty(self, block:Block):
-        # TODO: Currently using a PLACEHOLDER static difficulty!!!
-        if block.calculate_difficulty() >= 2**10:
-            return True
-        else:
-            return False
-
     def dumps(self):
-        information = [self.chain, self.unspent_transactions_tree.dumps()]
+        information = [self.chain, self.mass, self.unspent_transactions_tree.dumps()]
         return repr(information)
 
     @staticmethod
@@ -410,6 +391,13 @@ class Blockchain:
         try:
             json_obj = json.loads(json_str)
             assert type(json_obj) == list
+            assert len(json_obj) == 3
+            assert type(json_obj[0]) == list
+            for i, block_json in enumerate(json_obj[0]):
+                json_obj[i] = Block.loads(block_json)
+            assert type(json_obj[1]) == int
+            json_obj[2] = data_structures.AVL.loads(json_obj[2])
+
             return Blockchain(*json_obj)
         except Exception as err:
             raise ValueError(f"type(err)" + "err.args")
