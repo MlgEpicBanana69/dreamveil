@@ -393,8 +393,6 @@ class Connection:
         if not self.closed:
             message = str(len(message)).zfill(Connection.HEADER_LEN) + message
             self.socket.send(message.encode())
-        else:
-            raise Exception("Cannot send message. Connection is already closed.")
 
     def recv(self):
         try:
