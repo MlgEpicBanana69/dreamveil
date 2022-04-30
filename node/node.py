@@ -34,7 +34,6 @@ from node.dreamveil import Blockchain
 #   Does not attempt to solve any blocks
 
 # TODO: Shifting prefer longest chain to prefer heaviest chain CRITICAL!!!
-# TODO: Delete used transactions from transaction_pool once a block is chained
 
 APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
@@ -205,7 +204,6 @@ class Server:
                     print(f"### SUCCESFULY MINED AND CHAINED BLOCK {mined_block.block_hash}")
                     if len(self.blockchain.chain) == 1:
                         self.miner_msg = ""
-
                     for transaction in mined_block.transactions:
                         if "BLOCK" not in transaction.inputs:
                             if transaction in self.transaction_pool:
@@ -478,16 +476,23 @@ class Connection:
         for i in range(peer_chain_len - my_chain_len + len(inventory)):
             new_bk = dreamveil.Block.loads(self.recv())
             if form_new_chain:
-                chain_result = new_blockchain.chain(new_bk)
+                chain_result = new_blockchain.chain_block(new_bk)
             else:
-                chain_result = Server.singleton.blockchain.chain(new_bk)
-            if not chain_result:
+                chain_result = Server.singleton.blockchain.chain_block(new_bk)
+
+            if chain_result:
+                for transaction in new_bk.transactions:
+                    if "BLOCK" not in transaction.inputs:
+                        if transaction in self.transaction_pool:
+                            self.transaction_pool.remove(transaction)
+            else:
                 print(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
                 if form_new_chain:
                     del new_blockchain
                 self.close()
                 return
             self.send("continue")
+
         if form_new_chain:
             # If the given blockchain is indeed larger than the current blockchain used
             if len(new_blockchain.chain) > len(Server.singleton.blockchain.chain):
