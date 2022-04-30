@@ -404,12 +404,13 @@ class Connection:
                 assert len(message_len) == Connection.HEADER_LEN
                 message_len = int(message_len)
                 assert message_len > 0
-                message_contents = message[Connection.HEADER_LEN:message_len]
+                message_contents = message[Connection.HEADER_LEN:Connection.HEADER_LEN + message_len]
+                assert len(message_contents) == message_len
             except (ValueError, AssertionError):
                 print(f"Recieved invalid message from ({self.address})")
                 self.close()
                 return
-            print(f"### Recieved message from ({self.address}): {message}")
+            print(f"### Recieved message from ({self.address}): {message_contents}")
             return message_contents
         except (ConnectionResetError, ConnectionAbortedError, OSError):
             if not self.closed:
