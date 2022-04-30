@@ -24,6 +24,7 @@ from node.dreamveil import Blockchain
 # Create a user file system for saving RSA keys (WIP)
 # implement whitedoable env loading that's organized (WIP)
 # implement online communication-wide encryption (integrity and confidentiallity) (NIP)
+# implement a changing PoW difficulty (NIP)
 # Implement the gui (NIP)
 
 # Behavior of miner:
@@ -48,6 +49,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
+        self.difficulty_target = 256 # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -199,7 +201,7 @@ class Server:
                 miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": block_reward}, {my_address: block_reward}, self.miner_msg, "", "").sign(self.host_keys)
                 mined_block.add_transaction(miner_reward_transaction)
 
-            if self.blockchain.verify_block_difficulty(mined_block):
+            if Server.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
                 if self.blockchain.chain_block(mined_block):
                     print(f"### SUCCESFULY MINED AND CHAINED BLOCK {mined_block.block_hash}")
                     if len(self.blockchain.chain) == 1:
@@ -217,6 +219,17 @@ class Server:
                     mined_block.mine()
             else:
                 mined_block.mine()
+    @staticmethod
+    def calculate_block_hash_difficulty(self, block_hash:str):
+        assert len(block_hash) == 64
+        binary_block_hash = bin(int(block_hash, base=16))[2::].zfill(256)
+        difficulty = 1
+        for b in binary_block_hash:
+            if b == '0':
+                difficulty *= 2
+            else:
+                break
+        return difficulty
 
 class Connection:
     COMMAND_SIZE = 6
@@ -317,8 +330,8 @@ class Connection:
                     bk_prev_hash, bk_hash = param.split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
                     self.peer_chain_len += 1
-                    self.peer_top_block_hash = new_bk.block_hash
-                    if my_top_bk.block_hash == bk_prev_hash:
+                    self.peer_top_block_hash = bk_hash
+                    if my_top_bk.block_hash == bk_prev_hash and Server.calculate_block_hash_difficulty(bk_hash) > Server.singleton.difficulty_target:
                         self.send("True")
                         new_bk = dreamveil.Block.loads(self.recv())
                         if new_bk.block_hash == bk_hash:
@@ -433,16 +446,16 @@ class Connection:
     @connection_command
     def CHNSYN(self):
         # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
-        my_chain_len = len(Server.singleton.blockchain.chain)
+        my_chain_mass = len(Server.singleton.blockchain.chain)
         self.send(f"{my_chain_len} {Server.singleton.blockchain.chain[-1].block_hash()}")
 
-        peer_chain_len, peer_top_block_hash = self.recv().split(' ')
-        peer_chain_len = int(peer_chain_len)
-        assert peer_chain_len > 0
-        self.peer_chain_len = peer_chain_len
+        peer_chain_mass, peer_top_block_hash = self.recv().split(' ')
+        peer_chain_mass = int(peer_chain_mass)
+        assert peer_chain_mass > 0 and math.log(peer_chain_mass, 2) % 1 == 0
+        self.peer_chain_mass = peer_chain_mass
         self.peer_top_block_hash = peer_top_block_hash
 
-        if peer_chain_len < my_chain_len + dreamveil.Blockchain.TRUST_HEIGHT:
+        if peer_chain_mass >= my_chain_:
             self.send("False")
             return
         self.send("True")
