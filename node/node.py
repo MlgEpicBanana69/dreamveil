@@ -234,7 +234,7 @@ class Connection:
         self.peer_top_block_hash = None
 
         if address not in Server.singleton.peers:
-            Server.singleton.peers[address] = self
+            Server.singleton.peers[self.address] = self
         else:
             self.close()
 
