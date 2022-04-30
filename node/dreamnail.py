@@ -5,6 +5,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Hash import SHA256, HMAC
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES
+from pkg_resources import ExtractionError
 
 def encrypt(passphrase:str, pt:str):
     """
@@ -15,8 +16,8 @@ def encrypt(passphrase:str, pt:str):
     :str pt: The message to be encrypted using the passphrase
     :returns: The binary information: HMAC || salt || nonce || ct
     """
-    passphrase = passphrase.encode()
     pt = pt.encode()
+    passphrase = passphrase.encode()
 
     salt = get_random_bytes(16)
     expansion = PBKDF2(passphrase, salt, 32, count=1000000, hmac_hash_module=SHA256)
@@ -43,7 +44,7 @@ def decrypt(passphrase:str, ct:bytes):
     encrypted_pt = ct[56::]
     mac = HMAC.new(expansion[16::], salt + nonce + encrypted_pt, digestmod=SHA256)
     if not secrets.compare_digest(mac.digest(), proposed_mac):
-        raise ValueError("Incorrect passphrase or invalid message")
+        raise ExtractionError("Incorrect passphrase or invalid message")
 
     pt = AES.new(key=expansion[:16:], mode=AES.MODE_CTR, nonce=nonce).decrypt(encrypted_pt)
     return pt

@@ -1,4 +1,7 @@
+from itertools import chain
+from pkg_resources import ExtractionError
 import dreamveil
+import dreamnail
 
 import configparser
 import ipaddress
@@ -7,7 +10,9 @@ import secrets
 import json
 import random
 import math
+import atexit
 import time
+import getpass
 from Crypto.PublicKey import RSA
 
 import socket
@@ -45,7 +50,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
-        self.difficulty_target = 256 # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**14) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -72,18 +77,18 @@ class Server:
 
     def roll_peer(self):
         peer_options = []
-        deprecated_peer_options = []
+        offline_peer_options = []
         for peer, status in self.peer_pool.items():
             if status != Server.PEER_STATUS_OFFLINE and peer not in self.peers.keys():
                 peer_options.append(peer)
             elif status == Server.PEER_STATUS_OFFLINE and peer not in self.peers.keys():
-                deprecated_peer_options.append(peer)
+                offline_peer_options.append(peer)
         if len(peer_options) > 0:
             output = random.choice(peer_options)
             print(f"### Rolled {output} from peer options")
             return output
-        elif len(deprecated_peer_options) > 0:
-            output = random.choice(deprecated_peer_options)
+        elif len(offline_peer_options) > 0:
+            output = random.choice(offline_peer_options)
             return output
         else:
             return None
@@ -115,7 +120,7 @@ class Server:
                         # TODO: Define peer status system
                         if peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
                             peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
-                            print(f"### Marked {new_peer} as DEPRECATED")
+                            print(f"### Marked {new_peer} as OFFLINE")
                     else:
                         peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
 
@@ -146,7 +151,8 @@ class Server:
                 return new_peer
             except TimeoutError:
                 print(f"!!! Failed to connect to {address}")
-                del self.peers[address]
+                if address in self.peers:
+                    del self.peers[address]
                 return None
         else:
             print(f"!!! Failed to connect to {address}")
@@ -177,14 +183,16 @@ class Server:
     def miner(self):
         # TODO: Properly and fully implement
         transaction_pool_len = None
+        my_chain_len = None
         my_address = dreamveil.key_to_address(self.host_keys.public_key())
         while not self.closed:
             # Refresh the currently mined block when a new transaction is added to the pool
             # Also refresh the block once our top block changes (We chained a block.)
-            # this is on the account that the newly chained block will remove the used transactions in transaction_pool
-            if len(self.transaction_pool) != transaction_pool_len:
+            if len(self.transaction_pool) != transaction_pool_len or len(self.blockchain.chain) != my_chain_len:
                 transaction_pool_len = len(self.transaction_pool)
-                mined_block = dreamveil.Block(self.blockchain.chain[-1].block_hash, [], 0, "")
+                my_chain_len = len(self.blockchain.chain)
+                top_bk_hash = self.blockchain.chain[-1].block_hash if len(self.blockchain.chain) > 0 else ""
+                mined_block = dreamveil.Block(top_bk_hash, [], 0, "")
                 block_reward = dreamveil.to_decimal(self.blockchain.calculate_block_reward(len(self.blockchain.chain)))
                 for pool_transaction in self.transaction_pool:
                     try:
@@ -208,18 +216,16 @@ class Server:
                                 self.transaction_pool.remove(transaction)
                 else:
                     print(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
-                    with open(APPLICATION_PATH + f"POWfailed\\{mined_block.block_hash}.json.old", "w", encoding="utf-8") as backup_file:
+                    with open(APPLICATION_PATH + f"POWfailed\\{mined_block.block_hash}.json.old", "w+", encoding="utf-8") as backup_file:
                         backup_file.write(mined_block.dumps())
-                    print(f"### pausing miner thread for 30 seconds")
-                    time.sleep(30)
                     mined_block.mine()
             else:
                 mined_block.mine()
 
 class Connection:
     COMMAND_SIZE = 6
-    HEADER_LEN = len(str(dreamveil.Block.MAX_BLOCK_SIZE))
-    MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_BLOCK_SIZE
+    HEADER_LEN = len(str(dreamveil.Block.MAX_SIZE))
+    MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_SIZE
 
     def __init__(self, socket, address):
         self.socket = socket
@@ -517,14 +523,17 @@ class Connection:
 
         del Server.singleton.peers[self.address]
 
-def load_state():
-    if not os.path.isdir(APPLICATION_PATH + "state"):
-        os.mkdir(APPLICATION_PATH + "state")
-    if not os.path.isdir(APPLICATION_PATH + "state\\backup"):
-        os.mkdir(APPLICATION_PATH + "state\\backup")
+def exit_handler():
+    user_file.close()
 
-    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "state\\blockchain.json") else "w+"
-    with open(APPLICATION_PATH + "state\\blockchain.json", read_param) as f:
+def load_bench():
+    if not os.path.isdir(APPLICATION_PATH + "bench"):
+        os.mkdir(APPLICATION_PATH + "bench")
+    if not os.path.isdir(APPLICATION_PATH + "bench\\backup"):
+        os.mkdir(APPLICATION_PATH + "bench\\backup")
+
+    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "bench\\blockchain.json") else "w+"
+    with open(APPLICATION_PATH + "bench\\blockchain.json", read_param) as f:
         try:
             contents = f.read()
             if contents == "":
@@ -532,15 +541,15 @@ def load_state():
                 f.write(contents)
             blockchain = dreamveil.Blockchain.loads(contents)
         except (ValueError, AssertionError) as err:
-            print("!!! Could not loads blockchain from state")
+            print("!!! Could not loads blockchain from bench")
             print(err)
 
             f.close()
-            if os.path.isfile(APPLICATION_PATH + "state\\blockchain.json"):
-                os.rename(APPLICATION_PATH + "state\\blockchain.json", APPLICATION_PATH + f"state\\backup\\blockchain-{secrets.token_hex(8)}.json.old")
+            if os.path.isfile(APPLICATION_PATH + "bench\\blockchain.json"):
+                os.rename(APPLICATION_PATH + "bench\\blockchain.json", APPLICATION_PATH + f"bench\\backup\\blockchain-{secrets.token_hex(8)}.json.old")
 
-    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "state\\peer_pool.json") else "w+"
-    with open(APPLICATION_PATH + "state\\peer_pool.json", read_param) as f:
+    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "bench\\peer_pool.json") else "w+"
+    with open(APPLICATION_PATH + "bench\\peer_pool.json", read_param) as f:
         try:
             contents = f.read()
             if contents == "":
@@ -549,11 +558,11 @@ def load_state():
             peer_pool = json.loads(contents)
             assert type(peer_pool) == dict
         except (ValueError, AssertionError) as err:
-            print("!!! Could not loads peer pool from state")
+            print("!!! Could not loads peer pool from bench")
             print(err)
             f.close()
-            if os.path.isfile("state\\peer_pool.json"):
-                os.rename("state\\peer_pool.json", f"state\\backup\\peer_pool-{secrets.token_hex(8)}.json.old")
+            if os.path.isfile("bench\\peer_pool.json"):
+                os.rename("bench\\peer_pool.json", f"bench\\backup\\peer_pool-{secrets.token_hex(8)}.json.old")
 
     return blockchain, peer_pool
 
@@ -561,11 +570,33 @@ application_config = configparser.ConfigParser()
 application_config.read(APPLICATION_PATH + "node.cfg")
 VERSION = application_config["METADATA"]["version"]
 
-print("Loading state from saved files...")
-blockchain, peer_pool = load_state()
-print("Finished loading state")
+print("Loading bench from saved files...")
+blockchain, peer_pool = load_bench()
+print("Finished loading bench")
 
-server = Server(VERSION, blockchain, peer_pool, application_config["SERVER"]["address"])
+username = ""
+while username == "" or not os.path.isfile(APPLICATION_PATH + f"users\\{username}"):
+    username = input("Username: ")
+
+while True:
+    password = getpass.getpass(prompt="Password: ")
+    with open(APPLICATION_PATH + f"users\\{username}", "rb") as user_file:
+        atexit.register(exit_handler)
+        try:
+            # Encrypts
+            #user_file_contents = RSA.generate(2048)
+            #user_file_contents = user_file_contents.export_key('PEM')
+            #user_file_contents = json.dumps([user_file_contents.decode()])
+            #user_file_contents = dreamnail.encrypt(password, user_file_contents)
+            #user_file.write(user_file_contents)
+            user_file_contents = user_file.read()
+            host_keys = [RSA.import_key(key) for key in json.loads(dreamnail.decrypt(password, user_file_contents).decode())]
+            break
+        except (ExtractionError, json.JSONDecodeError):
+            print("Invalid password!")
+
+
+server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True)
 
 # Main thread loop
 while True:

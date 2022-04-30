@@ -32,9 +32,9 @@ class AVL:
         """Finds and returns the node of a given key in the tree. Returns None if does not exist"""
         if root is not None:
             if key > root.key:
-                return self.find(root.right, key)
+                return self._find(root.right, key)
             elif key < root.key:
-                return self.find(root.left, key)
+                return self._find(root.left, key)
             else:
                 return root
         else:
@@ -53,9 +53,9 @@ class AVL:
             return node
 
         if node.key > root.key:
-            root.right = self.insert(root.right, node)
+            root.right = self._insert(root.right, node)
         elif node.key < root.key:
-            root.left = self.insert(root.left, node)
+            root.left = self._insert(root.left, node)
         else:
             root.value = node.value
 
@@ -206,7 +206,7 @@ class multifurcasting_tree:
             return
 
         for child in root.children:
-            result = self.insert(val, prev_val, child)
+            result = self._insert(val, prev_val, child)
             if result is not None:
                 break
         return result

@@ -7,7 +7,7 @@ import json
 
 import data_structures
 
-def to_decimal(number:str):
+def to_decimal(number):
     """
     Converts a string represting a number to Decimal.
     This function does not allow otherwise legal special Decimals such as NaN and infinities.
@@ -19,11 +19,10 @@ def to_decimal(number:str):
         for c in number:
             if not c.isdigit() and c != ".":
                 break
-        else:
-            output = decimal.Decimal(number)
-            if output.is_finite():
-                return output
-    raise decimal.InvalidOperation(f"Invalid number given")
+    output = decimal.Decimal(number)
+    if output.is_finite():
+        return output
+    raise decimal.InvalidOperation(f"Invalid number given. (char: {c})")
 
 def address_to_key(address:str):
     """
@@ -37,7 +36,7 @@ def key_to_address(rsa_key:RSA.RsaKey):
     Converts an rsa key to address
     :returns: str address
     """
-    return base64.b64encode(rsa_key.export_key()).decoded()
+    return base64.b64encode(rsa_key.export_key()).decode()
 
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
@@ -100,7 +99,7 @@ class Transaction:
                 input_value = to_decimal(input_value)
                 if type(input_key) != str:
                     return False
-                if len(input_key) != 64:
+                if len(input_key) != 600:
                     if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK"):
                         return False
                 if input_value < 0:
@@ -108,11 +107,11 @@ class Transaction:
                 inputs_sum += input_value
 
             outputs_sum = 0
-            for output_key, output_value in self.outputs.keys():
+            for output_key, output_value in self.outputs.items():
                 output_value = to_decimal(output_value)
                 if type(output_key) != str:
                     return False
-                if len(output_key) != 64:
+                if len(output_key) != 600:
                     if not has_miner_fee and output_key == "MINER":
                         has_miner_fee = True
                     else:
@@ -321,7 +320,7 @@ class Blockchain:
 
     GENESIS_MESSAGE = r"""Dreamveil - The coolest blockchain, 12th grade cyber project."""
 
-    # Transaction record tree
+    # Unspent_transaction_tree
     # Transaction signature: (spent, value)
     def __init__(self, chain=[], mass=0, unspent_transactions_tree=None):
         self.chain = chain
@@ -347,17 +346,19 @@ class Blockchain:
         self.mass += Block.calculate_block_hash_difficulty(block.block_hash)
 
         # For each now accepted transaction in the newly trusted block
-        for transaction in self.chain[-1].transaction:
-            # Mark the transaction as unspent
-            data_structures.binary_tree_node(transaction.signature, transaction.outputs)
+        for transaction in self.chain[-1].transactions:
+            # Mark the new transaction as unspent
+            self.unspent_transactions_tree.insert(data_structures.binary_tree_node(transaction.signature, transaction.outputs))
 
             # For each input the new transaction referenced
             for heavenly_principle_struck_transaction in transaction.inputs: # All is lost to time (and use) (?)
                 # Find the node that stores the status of the input-referenced transaction
                 intree_node = self.unspent_transactions_tree.find(heavenly_principle_struck_transaction)
 
-                # We remove the transaction's output as it was spent
-                del intree_node[transaction.sender]
+                if intree_node is not None:
+                    # We remove the transaction's output as it was spent
+                    del intree_node.value[transaction.sender]
+            self.unspent_transactions_tree
 
         return True
 
@@ -405,13 +406,14 @@ class Blockchain:
     def loads(json_str):
         try:
             json_obj = json.loads(json_str)
-            assert type(json_obj) == list
-            assert len(json_obj) == 3
-            assert type(json_obj[0]) == list
-            for i, block_json in enumerate(json_obj[0]):
-                json_obj[i] = Block.loads(block_json)
-            assert type(json_obj[1]) == int
-            json_obj[2] = data_structures.AVL.loads(json_obj[2])
+            if json_obj != []:
+                assert type(json_obj) == list
+                assert len(json_obj) == 3
+                assert type(json_obj[0]) == list
+                for i, block_json in enumerate(json_obj[0]):
+                    json_obj[i] = Block.loads(block_json)
+                assert type(json_obj[1]) == int
+                json_obj[2] = data_structures.AVL.loads(json_obj[2])
 
             return Blockchain(*json_obj)
         except Exception as err:
@@ -430,7 +432,7 @@ class Blockchain:
         :param Height: Height of the block
         :returns: decimal.Decimal block_reward
         """
-        q = to_decimal(0.5)
+        q = 0.5
         n = height // Blockchain.BLOCK_REWARD_SEASON
         block_reward = Blockchain.BLOCK_INITIAL_REWARD * q**n
         return to_decimal(block_reward)
