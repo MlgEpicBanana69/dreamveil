@@ -230,7 +230,6 @@ class Connection:
         self.closed = False
         self.lock = threading.Lock()
         self.peer_chain_mass = None
-        self.peer_top_block_hash = None
 
         if address not in Server.singleton.peers:
             Server.singleton.peers[self.address] = self
@@ -247,15 +246,11 @@ class Connection:
             self.send(Server.singleton.version)
             peer_version = self.recv()
             assert peer_version == Server.singleton.version
-
-            argument = f"{Server.singleton.blockchain.chain[-1].get_header()} {len(Server.singleton.blockchain.chain)}"
-            self.send(argument)
-            peer_chain_mass, peer_top_block_hash = self.recv().split(' ')
+            self.send(str(Server.singleton.blockchain.mass))
+            peer_chain_mass = self.recv()
             peer_chain_mass = int(peer_chain_mass)
             assert peer_chain_mass > 0
             self.peer_chain_mass == peer_chain_mass
-            self.peer_top_block_hash = peer_top_block_hash
-
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
             peers_to_share = random.sample(Server.singleton.peer_pool.keys(), 100)
             self.send(" ".join(peers_to_share))
@@ -324,7 +319,6 @@ class Connection:
                     bk_prev_hash, bk_hash = param.split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
-                    self.peer_top_block_hash = bk_hash
                     if my_top_bk.block_hash == bk_prev_hash and dreamveil.Block.calculate_block_hash_difficulty(bk_hash) >= Server.singleton.difficulty_target:
                         self.send("True")
                         new_bk = dreamveil.Block.loads(self.recv())
@@ -349,15 +343,14 @@ class Connection:
                             chnsyn_thread = threading.Thread(target=self.CHNSYN)
                             chnsyn_thread.start()
                 case "CHNSYN":
-                    peer_chain_mass, peer_chain_len, peer_top_block_hash = self.recv().split(' ')
+                    peer_chain_mass, peer_chain_len = self.recv().split(' ')
                     peer_chain_mass = int(peer_chain_mass)
                     peer_chain_len = int(peer_chain_len)
                     assert peer_chain_mass >= 0 and peer_chain_len >= 0
                     self.peer_chain_mass = peer_chain_mass
-                    self.peer_top_block_hash = peer_top_block_hash
 
                     my_chain_mass = Server.singleton.blockchain.mass
-                    self.send(f"{my_chain_mass} {Server.singleton.blockchain.chain[-1].block_hash}")
+                    self.send(f"{my_chain_mass}")
 
                     if self.recv() == "True":
                         hash_batches_sent = 0
@@ -452,13 +445,12 @@ class Connection:
         # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
         my_chain_mass = Server.singleton.blockchain.mass
         my_chain_len = len(Server.singleton.blockchain.chain)
-        self.send(f"{my_chain_mass} {Server.singleton.blockchain.chain[-1].block_hash}")
+        self.send(f"{my_chain_mass}")
 
-        peer_chain_mass, peer_top_block_hash = self.recv().split(' ')
+        peer_chain_mass = self.recv()
         peer_chain_mass = int(peer_chain_mass)
         assert peer_chain_mass > 0
         self.peer_chain_mass = peer_chain_mass
-        self.peer_top_block_hash = peer_top_block_hash
 
         if peer_chain_mass < my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
             self.send("False")
