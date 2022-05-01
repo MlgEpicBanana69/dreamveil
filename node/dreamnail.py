@@ -48,7 +48,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
-        self.difficulty_target = int(2**12) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**6) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -245,6 +245,7 @@ class Connection:
 
     def setup(self):
         try:
+            self.lock.acquire()
             # Check that node versions match
             self.send(Server.singleton.version)
             peer_version = self.recv()
@@ -268,6 +269,7 @@ class Connection:
                     Server.singleton.peer_pool[peer] = Server.PEER_STATUS_UNKNOWN
 
             print(f"### Connection with {self.address} completed setup (version: {peer_version})")
+            self.lock.release()
         except (AssertionError, TimeoutError) as err:
             print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
