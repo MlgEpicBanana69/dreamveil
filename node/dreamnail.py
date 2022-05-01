@@ -228,10 +228,10 @@ class Connection:
 
     def __init__(self, socket, address):
         self.started = False
+        self.lock = threading.Lock()
         self.socket = socket
         self.address = address
         self.closed = False
-        self.lock = threading.Lock()
         self.peer_chain_mass = None
 
         if address not in Server.singleton.peers:
@@ -245,7 +245,6 @@ class Connection:
 
     def setup(self):
         try:
-            self.lock.acquire()
             # Check that node versions match
             self.send(Server.singleton.version)
             peer_version = self.recv()
@@ -269,7 +268,6 @@ class Connection:
                     Server.singleton.peer_pool[peer] = Server.PEER_STATUS_UNKNOWN
 
             print(f"### Connection with {self.address} completed setup (version: {peer_version})")
-            self.lock.release()
         except (AssertionError, TimeoutError) as err:
             print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
@@ -286,9 +284,7 @@ class Connection:
                 command_message = self.recv()
                 valid_command_message = True
                 if len(command_message) >= Connection.COMMAND_SIZE:
-                    command = command_message[:Connection.COMMAND_SIZE]
-                    argument = command_message[Connection.COMMAND_SIZE:]
-                    if not self.parse_command(command, argument):
+                    if not self.parse_command(command_message):
                         valid_command_message = False
                 else:
                     valid_command_message = False
@@ -302,8 +298,9 @@ class Connection:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
                 self.close()
 
-    def parse_command(self, command:str, param:str):
+    def parse_command(self, command:str):
         try:
+            self.send("pass")
             # I GOT ...
             match command:
                 case "SENDTX":
@@ -384,7 +381,6 @@ class Connection:
             return True
         except (AssertionError, ValueError) as command_err:
             log_str  = f"!!! Failure while executing {command} from {self.address}\n"
-            log_str += f"COMMAND PARAM\n{param}\nEND COMMAND PARAM\n"
             log_str += f"Error that was caught: {command_err}"
             print(log_str)
             return False
