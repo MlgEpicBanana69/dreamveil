@@ -255,7 +255,7 @@ class Connection:
             self.peer_chain_mass = peer_chain_mass
 
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
-            peers_to_share = random.sample(list(Server.singleton.peer_pool.keys()), max(100, len(Server.singleton.peer_pool)))
+            peers_to_share = random.sample(list(Server.singleton.peer_pool.keys()), min(100, len(Server.singleton.peer_pool)))
             self.send(json.dumps(peers_to_share))
             newly_given_peers = json.loads(self.recv())
             assert len(newly_given_peers) <= 100 and type(newly_given_peers) == list
