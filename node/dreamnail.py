@@ -246,19 +246,22 @@ class Connection:
             self.send(Server.singleton.version)
             peer_version = self.recv()
             assert peer_version == Server.singleton.version
+
+            # Exchange chain masses
             self.send(f"{Server.singleton.blockchain.mass}")
             peer_chain_mass = self.recv()
             peer_chain_mass = int(peer_chain_mass)
             assert peer_chain_mass >= 0
             self.peer_chain_mass = peer_chain_mass
+
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
-            peers_to_share = random.sample(list(Server.singleton.peer_pool.keys()), 100)
-            self.send(" ".join(peers_to_share))
-            newly_given_peers = self.recv().split(' ')
-            assert len(newly_given_peers) <= 100
+            peers_to_share = random.sample(list(Server.singleton.peer_pool.keys()), max(100, len(Server.singleton.peer_pool)))
+            self.send(json.dumps(peers_to_share))
+            newly_given_peers = json.loads(self.recv())
+            assert len(newly_given_peers) <= 100 and type(newly_given_peers) == list
             for peer in newly_given_peers:
                 assert ipaddress.ip_address(peer)
-                if peer not in Server.singleton.peer_pool:
+                if peer not in Server.singleton.peer_pool and peer != Server.singleton.address:
                     Server.singleton.peer_pool[peer] = Server.PEER_STATUS_UNKNOWN
 
             print(f"### Connection with {self.address} completed setup (version: {peer_version})")
