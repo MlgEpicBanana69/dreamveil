@@ -210,6 +210,9 @@ class Server:
                         if "BLOCK" not in transaction.inputs:
                             if transaction in self.transaction_pool:
                                 self.transaction_pool.remove(transaction)
+                    for peer_connection in self.peers.values():
+                        action_thread = threading.Thread(target=peer_connection.SENDBK, args=(mined_block,))
+                        action_thread.start()
                 else:
                     print(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
                     with open(APPLICATION_PATH + f"POWfailed\\{mined_block.block_hash}.json.old", "w+", encoding="utf-8") as backup_file:
