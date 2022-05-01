@@ -304,7 +304,7 @@ class Connection:
             # I GOT ...
             match command:
                 case "SENDTX":
-                    tx_signature = param.split(' ')
+                    tx_signature = self.recv().split(' ')
                     try:
                         assert Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
                         Server.find_in_transaction_pool(tx_signature)
@@ -321,7 +321,7 @@ class Connection:
                         else:
                             self.close()
                 case "SENDBK":
-                    bk_prev_hash, bk_hash = param.split(' ')
+                    bk_prev_hash, bk_hash = self.recv().split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
                     if my_top_bk.block_hash == bk_prev_hash and dreamveil.Block.calculate_block_hash_difficulty(bk_hash) >= Server.singleton.difficulty_target:
