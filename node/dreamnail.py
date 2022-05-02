@@ -43,7 +43,7 @@ class Server:
     PEER_STATUS_UNKNOWN = "UNKNOWN"
     TRUST_HEIGHT = 6
 
-    def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner:bool, miner_msg:str="", port:int=22727, max_peer_amount:int=150):
+    def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner:bool, miner_msg:str="", port:int=22222, max_peer_amount:int=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
 
@@ -144,8 +144,8 @@ class Server:
             peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 peer_socket.connect((address, self.port))
-            except TimeoutError:
-                print(f"!!! Failed to connect to {address}")
+            except (TimeoutError, OSError):
+                print(f"!!! Failed to connect to {address} due ")
                 return None
             new_peer = Connection(peer_socket, address)
             print(f"### Server connected to {address}")
@@ -239,7 +239,6 @@ class Connection:
         else:
             self.close()
 
-        self.started = True
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
 
@@ -276,6 +275,7 @@ class Connection:
     def run(self):
         self.lock.acquire()
         self.setup()
+        self.started = True
         while not self.closed:
             try:
                 if not self.lock.locked():
@@ -416,7 +416,7 @@ class Connection:
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
             try:
-                if self.closed:
+                if self.closed or not self.started:
                     return
                 self.send(command_func.__name__)
                 self.lock.acquire()
@@ -601,7 +601,7 @@ while True:
         except (ValueError, json.JSONDecodeError):
             print("Invalid password!")
 
-server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True)
+server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=application_config["SERVER"]["port"])
 
 # Main thread loop
 while True:
