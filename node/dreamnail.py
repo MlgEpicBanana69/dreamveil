@@ -227,7 +227,7 @@ class Connection:
     MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_SIZE
 
     def __init__(self, socket, address):
-        self.started = False
+        self.allow_override = False
         self.lock = threading.Lock()
         self.socket = socket
         self.address = address
@@ -275,12 +275,12 @@ class Connection:
     def run(self):
         self.lock.acquire()
         self.setup()
-        self.started = True
         while not self.closed:
             try:
                 if not self.lock.locked():
                     self.lock.acquire()
                 print(f"### Listening to {self.address}...")
+                self.allow_override = True
                 command_message = self.recv()
                 valid_command_message = True
                 if len(command_message) >= Connection.COMMAND_SIZE:
@@ -293,6 +293,7 @@ class Connection:
                     print(f"### Executed {command_message} with {self.address}")
                 else:
                     print(f"### Left run thread")
+                self.allow_override = False
                 self.lock.release()
             except Exception as err:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
@@ -416,7 +417,7 @@ class Connection:
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
             try:
-                if self.closed or not self.started:
+                if self.closed or not self.allow_override:
                     return
                 self.send(command_func.__name__)
                 self.lock.acquire()
@@ -523,7 +524,7 @@ class Connection:
 
         print(f"### Terminated connection with {self.address}")
 
-        if self.address in Server.singleton.peers and self.started:
+        if self.address in Server.singleton.peers and self.allow_override:
             del Server.singleton.peers[self.address]
 
         self.socket.close()
