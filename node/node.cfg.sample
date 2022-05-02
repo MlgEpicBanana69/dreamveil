@@ -3,3 +3,4 @@ version = 1.0.0a
 
 [SERVER]
 address = 127.0.0.1
+port = 22222
