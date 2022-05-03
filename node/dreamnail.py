@@ -276,13 +276,14 @@ class Connection:
     def run(self):
         self.lock.acquire()
         self.setup()
+        self.lock.release()
         while not self.closed:
             try:
-                if not self.lock.locked():
-                    self.lock.acquire()
+                self.lock.acquire()
                 print(f"### Listening to {self.address}...")
-                self.allow_override = False
+                self.allow_override = True
                 command_message = self.recv()
+                self.allow_override = False
                 valid_command_message = True
                 if len(command_message) >= Connection.COMMAND_SIZE:
                     if not self.parse_command(command_message):
@@ -292,9 +293,6 @@ class Connection:
 
                 if valid_command_message:
                     print(f"### Executed {command_message} with {self.address}")
-                else:
-                    print(f"### Left run thread")
-                self.allow_override = True
                 self.lock.release()
             except Exception as err:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
@@ -382,6 +380,8 @@ class Connection:
                             blocks_sent+=1
                             self.recv()
                         print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
+                case _:
+                    return False
             return True
         except (AssertionError, ValueError) as command_err:
             log_str  = f"!!! Failure while executing {command} from {self.address}\n"
@@ -421,8 +421,10 @@ class Connection:
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
             try:
-                if self.closed or not self.allow_override:
+                if self.closed:
                     return
+                while not self.allow_override:
+                    pass
                 self.send(command_func.__name__)
                 self.lock.acquire()
                 print(f"### Locked {command_func.__name__} in {self.address}")

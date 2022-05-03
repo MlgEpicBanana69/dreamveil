@@ -302,7 +302,7 @@ class Block:
 
     def get_header(self):
         """Returns a short str containing the descriptive variables of the block seperated by space. Used for identification."""
-        return f"{self.previous_block_hash} {self.block_hash}"
+        return json.dumps([self.previous_block_hash, self.block_hash])
 
     def mine(self):
         """
