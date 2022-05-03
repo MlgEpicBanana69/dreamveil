@@ -48,7 +48,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
 
         Server.singleton = self
-        self.difficulty_target = int(2**6) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**10) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -237,7 +237,7 @@ class Connection:
         if address not in Server.singleton.peers:
             Server.singleton.peers[self.address] = self
         else:
-            self.close()
+            self.close(remove_peer=False)
 
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
@@ -259,7 +259,8 @@ class Connection:
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
             peers_to_share = random.sample(list(Server.singleton.peer_pool.keys()), min(100, len(Server.singleton.peer_pool)))
             self.send(json.dumps(peers_to_share))
-            newly_given_peers = json.loads(self.recv())
+            newly_given_peers = self.recv()
+            newly_given_peers = json.loads(newly_given_peers)
             assert len(newly_given_peers) <= 100 and type(newly_given_peers) == list
             for peer in newly_given_peers:
                 assert ipaddress.ip_address(peer)
@@ -280,7 +281,7 @@ class Connection:
                 if not self.lock.locked():
                     self.lock.acquire()
                 print(f"### Listening to {self.address}...")
-                self.allow_override = True
+                self.allow_override = False
                 command_message = self.recv()
                 valid_command_message = True
                 if len(command_message) >= Connection.COMMAND_SIZE:
@@ -293,7 +294,7 @@ class Connection:
                     print(f"### Executed {command_message} with {self.address}")
                 else:
                     print(f"### Left run thread")
-                self.allow_override = False
+                self.allow_override = True
                 self.lock.release()
             except Exception as err:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
@@ -301,10 +302,10 @@ class Connection:
 
     def parse_command(self, command:str):
         try:
-            self.send("pass")
             # I GOT ...
             match command:
                 case "SENDTX":
+                    self.send(f"ACK {command}")
                     tx_signature = self.recv().split(' ')
                     try:
                         assert Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
@@ -322,6 +323,7 @@ class Connection:
                         else:
                             self.close()
                 case "SENDBK":
+                    self.send(f"ACK {command}")
                     bk_prev_hash, bk_hash = self.recv().split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
@@ -349,6 +351,7 @@ class Connection:
                             chnsyn_thread = threading.Thread(target=self.CHNSYN)
                             chnsyn_thread.start()
                 case "CHNSYN":
+                    self.send(f"ACK {command}")
                     peer_chain_mass, peer_chain_len = self.recv().split(' ')
                     peer_chain_mass = int(peer_chain_mass)
                     peer_chain_len = int(peer_chain_len)
@@ -389,6 +392,7 @@ class Connection:
     def send(self, message:str):
         assert len(message) <= Connection.MAX_MESSAGE_SIZE
 
+        print(f"### Sending message to ({self.address}): {message}")
         if not self.closed:
             message = str(len(message)).zfill(Connection.HEADER_LEN) + message
             self.socket.send(message.encode())
@@ -519,12 +523,12 @@ class Connection:
         print(f"### With ({self.address}) finished syncing new chain with mass {Server.singleton.blockchain.chain.mass} and length {len(Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
     #endregion
 
-    def close(self):
+    def close(self, remove_peer=True):
         self.closed = True
 
         print(f"### Terminated connection with {self.address}")
 
-        if self.address in Server.singleton.peers and self.allow_override:
+        if self.address in Server.singleton.peers and remove_peer:
             del Server.singleton.peers[self.address]
 
         self.socket.close()
