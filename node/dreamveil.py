@@ -205,10 +205,6 @@ class Block:
         """
         self.transactions.remove(transaction)
 
-    def get_contents(self):
-        information = [self.previous_block_hash, self.transactions, self.nonce]
-        return json.dumps(information)
-
     def hash_block(self):
         """
         Calculates and sets the hash of the block
@@ -260,6 +256,16 @@ class Block:
             print("Block rejected!")
             raise err
 
+    def dumps(self):
+        transactions_json_object = [tx.dumps() for tx in self.transactions]
+        information = [self.previous_block_hash, transactions_json_object, self.nonce, self.block_hash]
+        return json.dumps(information)
+
+    def get_contents(self):
+        transactions_json_object = [tx.dumps() for tx in self.transactions]
+        information = [self.previous_block_hash, transactions_json_object, self.nonce]
+        return json.dumps(information)
+
     def verify_transactions(block_transactions:list):
         try:
             # Verifies that there are no duplicate transactions
@@ -295,10 +301,6 @@ class Block:
         output = secrets.compare_digest(proposed_hash, computed_hash)
         self.block_hash = proposed_hash
         return output
-
-    def dumps(self):
-        information = [self.previous_block_hash, self.transactions, self.nonce, self.block_hash]
-        return json.dumps(information)
 
     def get_header(self):
         """Returns a short str containing the descriptive variables of the block seperated by space. Used for identification."""
