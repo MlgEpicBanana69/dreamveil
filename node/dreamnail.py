@@ -206,18 +206,8 @@ class Server:
                 mined_block.add_transaction(miner_reward_transaction)
 
             if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
-                if self.blockchain.chain_block(mined_block):
-                    print(f"### SUCCESFULY MINED AND CHAINED BLOCK {mined_block.block_hash}")
-                    if len(self.blockchain.chain) == 1:
-                        self.miner_msg = ""
-                    for transaction in mined_block.transactions:
-                        if "BLOCK" not in transaction.inputs:
-                            if transaction in self.transaction_pool:
-                                self.transaction_pool.remove(transaction)
-                    current_peer_connections = list(self.peers.values())
-                    for peer_connection in current_peer_connections:
-                        action_thread = threading.Thread(target=peer_connection.SENDBK, args=(mined_block,))
-                        action_thread.start()
+                if self.try_chain_block(mined_block):
+                    print(f"### MINED BLOCK {mined_block.block_hash}")
                 else:
                     print(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
                     with open(APPLICATION_PATH + f"POWfailed\\{mined_block.block_hash}.json.old", "w+", encoding="utf-8") as backup_file:
@@ -225,6 +215,27 @@ class Server:
                     mined_block.mine()
             else:
                 mined_block.mine()
+
+    def try_chain_block(self, block, exclusions=[]):
+        try:
+            if self.blockchain.chain_block(block):
+                print(f"### SUCCESFULY CHAINED BLOCK {block.block_hash}")
+                if len(self.blockchain.chain) == 1:
+                    self.miner_msg = ""
+                for transaction in block.transactions:
+                    if "BLOCK" not in transaction.inputs:
+                        if transaction in self.transaction_pool:
+                            self.transaction_pool.remove(transaction)
+                current_peer_addresses = list(self.peers.keys())
+                for peer_addr in current_peer_addresses:
+                    if peer_addr not in exclusions:
+                        action_thread = threading.Thread(target=self.peers[peer_addr].SENDBK, args=(block,))
+                        action_thread.start()
+                return True
+            else:
+                return False
+        except KeyError:
+            return False
 
 class Connection:
     COMMAND_SIZE = 6
@@ -332,15 +343,7 @@ class Connection:
                         recieved_block_json = self.recv()
                         new_bk = dreamveil.Block.loads(recieved_block_json)
                         if new_bk.block_hash == bk_hash:
-                            if Server.singleton.blockchain.chain_block(new_bk):
-                                for transaction in new_bk.transactions:
-                                    if "BLOCK" not in transaction.inputs:
-                                        if transaction in Server.singleton.transaction_pool:
-                                            Server.singleton.transaction_pool.remove(transaction)
-                                for peer_addr, peer_connection in Server.singleton.peers.items():
-                                    if peer_addr != self.address:
-                                        action_thread = threading.Thread(target=peer_connection.SENDBK, args=(new_bk,))
-                                        action_thread.start()
+                            Server.singleton.try_chain_block(exclusions=self.address)
                         else:
                             raise AssertionError("Value not as client specified")
                     else:
@@ -426,7 +429,7 @@ class Connection:
                 output = command_func(self, *args, **kwargs)
                 return output
             except Exception as err:
-                print(f"!!! Connection with {self.address} forcibly closed due to failure {err}. {command_func}")
+                print(f"!!! Failed commanding {self.address} due to error {err}. {command_func}")
                 self.close()
             finally:
                 self.lock.release()
