@@ -68,7 +68,7 @@ class Transaction:
         # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
         transaction_hash = SHA256.new(self.get_contents().encode()).hexdigest()
         # Sign the transaction hash using the RSA private key
-        digital_signature = hex((int(transaction_hash, base=16) ** private_key.e) % private_key.n)[2::]
+        digital_signature = hex((int(transaction_hash, base=16) ** private_key.d) % private_key.n)[2::]
         # Set and return the generated digital signature
         self.signature = digital_signature
         return self
@@ -78,9 +78,9 @@ class Transaction:
         # TODO DEBUG THIS
         try:
             rsa_public_key = address_to_key(self.sender)
-            computed_hash = SHA256.new(self.dumps().encode()).hexdigest()
-            proposed_hash = hex((self.signature ** rsa_public_key.d) % rsa_public_key.n)[2::]
-            if secrets.compare_digest(computed_hash, proposed_hash):
+            computed_signature = SHA256.new(self.dumps().encode()).hexdigest()
+            proposed_signature = hex((int(self.signature, base=16) ** rsa_public_key.e) % rsa_public_key.n)[2::]
+            if secrets.compare_digest(computed_signature, proposed_signature):
                 return True
         except Exception as err:
             print(f"Verify signature raised exception {err}: {err.args}")
@@ -137,8 +137,8 @@ class Transaction:
             assert type(information[1]) == dict
             assert type(information[2]) == dict
             assert type(information[3]) == str and len(information[3]) <= 222
-            assert type(information[4]) == str and len(information[4]) == 32
-            assert type(information[5]) == str and type(address_to_key(information[5])) == RSA.RsaKey
+            assert type(information[4]) == str and len(information[4]) == 64
+            assert type(information[5]) == str and len(information[5]) == 512
 
             transaction_object = Transaction(*information)
             assert transaction_object.verify_io()
@@ -234,7 +234,7 @@ class Block:
             assert type(information) == list
             assert len(information) == 4
 
-            assert type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)
+            assert (type(information[0]) == str and len(information[0]) == 64 and int(information[0], base=16)) or information[0] == ''
             #region information[1]
             # Read and interpret each transaction object seperately
             assert type(information[1]) == list and len(information[1]) > 0
@@ -245,7 +245,7 @@ class Block:
             assert Block.verify_transactions(transactions)
             information[1] = transactions
             #endregion
-            assert information[2] >= 0
+            assert type(information[2]) == str and len(information[2]) == 64
             assert type(information[3]) == str and len(information[3]) == 64 and int(information[3], base=16)
 
             output = Block(*information)
@@ -259,6 +259,7 @@ class Block:
     def dumps(self):
         transactions_json_object = [tx.dumps() for tx in self.transactions]
         information = [self.previous_block_hash, transactions_json_object, self.nonce, self.block_hash]
+        Block.loads(json.dumps(information))
         return json.dumps(information)
 
     def get_contents(self):
@@ -268,6 +269,11 @@ class Block:
 
     def verify_transactions(block_transactions:list):
         try:
+            for transaction in block_transactions:
+                if type(transaction) == None:
+                    return False
+            if len(block_transactions) == 0:
+                return False
             # Verifies that there are no duplicate transactions
             all_signatures = [t.signature for t in block_transactions]
             for signature in all_signatures:
