@@ -241,6 +241,7 @@ class Connection:
         else:
             Connection.connection_lock.release()
             self.close(remove_peer=False)
+            return
         Connection.connection_lock.release()
 
         self.thread = threading.Thread(target=self.run)
@@ -272,7 +273,7 @@ class Connection:
                     Server.singleton.peer_pool[peer] = Server.PEER_STATUS_UNKNOWN
 
             print(f"### Connection with {self.address} completed setup (version: {peer_version})")
-        except (AssertionError, TimeoutError) as err:
+        except (AssertionError, TimeoutError, ValueError) as err:
             print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
             self.close()
@@ -318,7 +319,7 @@ class Connection:
                         else:
                             self.close()
                 case "SENDBK":
-                    bk_prev_hash, bk_hash = self.recv().split(' ')
+                    bk_prev_hash, bk_hash = json.loads(self.recv())
                     my_top_bk = Server.singleton.blockchain.chain[-1]
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
                     if my_top_bk.block_hash == bk_prev_hash and dreamveil.Block.calculate_block_hash_difficulty(bk_hash) >= Server.singleton.difficulty_target:
