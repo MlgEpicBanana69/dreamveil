@@ -108,9 +108,9 @@ class Transaction:
 
             outputs_sum = 0
             for output_key, output_value in self.outputs.items():
-                output_value = to_decimal(output_value)
                 if type(output_key) != str or type(output_value) != str:
                     return False
+                output_value = to_decimal(output_value)
                 if len(output_key) != 600:
                     if not has_miner_fee and output_key == "MINER":
                         has_miner_fee = True
