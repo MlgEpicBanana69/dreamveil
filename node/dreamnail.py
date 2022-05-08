@@ -46,8 +46,8 @@ class Server:
     def __init__(self, version:str, host_keys:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner:bool, miner_msg:str="", port:int=22222, max_peer_amount:int=150):
         if Server.singleton is not None:
             raise Exception("Singleton class limited to one instance")
-
         Server.singleton = self
+
         self.difficulty_target = int(2**12) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
@@ -60,7 +60,7 @@ class Server:
         self.peer_pool = peer_pool
         self.transaction_pool = transaction_pool
         self.is_miner = is_miner
-        self.connection_lock = threading.Lock()
+        self.peer_lock = threading.Lock()
         if len(self.blockchain.chain) == 0:
             self.miner_msg = dreamveil.Blockchain.GENESIS_MESSAGE
         else:
@@ -111,7 +111,7 @@ class Server:
         while not self.closed:
             # Once connection amount is too low, seek connections if possible.
             while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
-                self.connection_lock.acquire()
+                self.peer_lock.acquire()
                 new_peer = self.roll_peer()
                 if new_peer is not None:
                     connection_result = self.connect(new_peer)
@@ -122,7 +122,7 @@ class Server:
                             print(f"### Marked {new_peer} as OFFLINE")
                     else:
                         peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
-                self.connection_lock.release()
+                self.peer_lock.release()
 
     def accepter(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -134,10 +134,10 @@ class Server:
             # Do not accept new connections once peer count exceeds maximum allowed
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
-                self.connection_lock.acquire()
+                self.peer_lock.acquire()
                 Connection(peer_socket, peer_address[0])
                 print(f"### {peer_address[0]} connected to node")
-                self.connection_lock.release()
+                self.peer_lock.release()
 
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
@@ -225,19 +225,23 @@ class Connection:
     COMMAND_SIZE = 6
     HEADER_LEN = len(str(dreamveil.Block.MAX_SIZE))
     MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_SIZE
+    connection_lock = threading.Lock()
 
     def __init__(self, socket, address):
-        self.allow_override = False
+        Connection.connection_lock.acquire()
         self.lock = threading.Lock()
         self.socket = socket
         self.address = address
         self.closed = False
         self.peer_chain_mass = None
+        self.commanding = False
 
         if address not in Server.singleton.peers:
             Server.singleton.peers[self.address] = self
         else:
+            Connection.connection_lock.release()
             self.close(remove_peer=False)
+        Connection.connection_lock.release()
 
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
@@ -279,31 +283,24 @@ class Connection:
         self.lock.release()
         while not self.closed:
             try:
-                self.lock.acquire()
                 print(f"### Listening to {self.address}...")
-                self.allow_override = True
                 command_message = self.recv()
-                self.allow_override = False
-                valid_command_message = True
-                if len(command_message) >= Connection.COMMAND_SIZE:
-                    if not self.parse_command(command_message):
-                        valid_command_message = False
-                else:
-                    valid_command_message = False
-
-                if valid_command_message:
-                    print(f"### Executed {command_message} with {self.address}")
-                self.lock.release()
+                if self.execute_command(command_message):
+                    print(f"### Succesfuly executed {command_message} with {self.address}")
             except Exception as err:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
                 self.close()
 
-    def parse_command(self, command:str):
+    def execute_command(self, command:str):
+        commands = ("SENDTX", "SENDBK", "CHNSYN")
+        if len(command) < Connection.COMMAND_SIZE or command not in commands:
+                return False
+        self.lock.acquire()
         try:
+            self.send(f"ACK {command}")
             # I GOT ...
             match command:
                 case "SENDTX":
-                    self.send(f"ACK {command}")
                     tx_signature = self.recv().split(' ')
                     try:
                         assert Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
@@ -321,7 +318,6 @@ class Connection:
                         else:
                             self.close()
                 case "SENDBK":
-                    self.send(f"ACK {command}")
                     bk_prev_hash, bk_hash = self.recv().split(' ')
                     my_top_bk = Server.singleton.blockchain.chain[-1]
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
@@ -339,8 +335,7 @@ class Connection:
                                         action_thread = threading.Thread(target=peer_connection.SENDBK, args=(new_bk,))
                                         action_thread.start()
                         else:
-                            self.close()
-                            return
+                            raise AssertionError("Value not as client specified")
                     else:
                         self.send("False")
                         #region Check to see if peer's chain is significantly larger than the current one used
@@ -349,7 +344,6 @@ class Connection:
                             chnsyn_thread = threading.Thread(target=self.CHNSYN)
                             chnsyn_thread.start()
                 case "CHNSYN":
-                    self.send(f"ACK {command}")
                     peer_chain_mass, peer_chain_len = self.recv().split(' ')
                     peer_chain_mass = int(peer_chain_mass)
                     peer_chain_len = int(peer_chain_len)
@@ -369,9 +363,7 @@ class Connection:
                                 if split_index != "continue":
                                     break
                             else:
-                                print(f"!!! hash_batch came out empty while helping {self.address} to sync!")
-                                self.close()
-                                return
+                                raise AssertionError(f"!!! hash_batch came out empty while helping {self.address} to sync!")
                         split_index = int(split_index)
                         assert split_index >= 0 and split_index < len(Server.singleton.blockchain.chain)
                         blocks_sent = 0
@@ -380,14 +372,14 @@ class Connection:
                             blocks_sent+=1
                             self.recv()
                         print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
-                case _:
-                    return False
             return True
         except (AssertionError, ValueError) as command_err:
             log_str  = f"!!! Failure while executing {command} from {self.address}\n"
             log_str += f"Error that was caught: {command_err}"
             print(log_str)
             return False
+        finally:
+            self.lock.release()
 
     def send(self, message:str):
         assert len(message) <= Connection.MAX_MESSAGE_SIZE
@@ -421,14 +413,12 @@ class Connection:
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
             try:
-                if self.closed:
-                    return
-                while not self.allow_override:
-                    pass
-                self.send(command_func.__name__)
                 self.lock.acquire()
+                self.send(command_func.__name__)
+                self.commanding = True
                 print(f"### Locked {command_func.__name__} in {self.address}")
                 output = command_func(self, *args, **kwargs)
+                self.commanding = False
                 self.lock.release()
                 return output
             except Exception as err:
