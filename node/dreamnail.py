@@ -210,7 +210,7 @@ class Server:
                         if "BLOCK" not in transaction.inputs:
                             if transaction in self.transaction_pool:
                                 self.transaction_pool.remove(transaction)
-                    current_peer_connections = self.peers.values()
+                    current_peer_connections = list(self.peers.values())
                     for peer_connection in current_peer_connections:
                         action_thread = threading.Thread(target=peer_connection.SENDBK, args=(mined_block,))
                         action_thread.start()
@@ -518,15 +518,16 @@ class Connection:
     #endregion
 
     def close(self, remove_peer=True):
-        self.closed = True
-
-        print(f"### Terminated connection with {self.address}")
-
-        if self.address in Server.singleton.peers and remove_peer:
-            del Server.singleton.peers[self.address]
-
-        self.socket.close()
-        del self
+        Connection.connection_lock.acquire()
+        try:
+            self.closed = True
+            print(f"### Terminated connection with {self.address}")
+            if self.address in Server.singleton.peers and remove_peer:
+                del Server.singleton.peers[self.address]
+        finally:
+            self.socket.close()
+            Connection.connection_lock.release()
+            del self
 
 def exit_handler():
     user_file.close()
