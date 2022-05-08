@@ -242,7 +242,6 @@ class Connection:
             Connection.connection_lock.release()
             self.close(remove_peer=False)
             return
-        Connection.connection_lock.release()
 
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
@@ -277,6 +276,8 @@ class Connection:
             print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
             self.close()
+        finally:
+            Connection.connection_lock.release()
 
     def run(self):
         self.lock.acquire()
@@ -386,7 +387,7 @@ class Connection:
     def send(self, message:str):
         assert len(message) <= Connection.MAX_MESSAGE_SIZE
 
-        #print(f"### Sending message to ({self.address}): {message}")
+        print(f"### Sending message to ({self.address}): {message}")
         if not self.closed:
             message = str(len(message)).zfill(Connection.HEADER_LEN) + message
             self.socket.send(message.encode())
@@ -406,7 +407,7 @@ class Connection:
                 print(f"Recieved invalid message from ({self.address})")
                 self.close()
                 return
-            #print(f"### Recieved message from ({self.address}): {message_contents}")
+            print(f"### Recieved message from ({self.address}): {message_contents}")
             return message_contents
         except (ConnectionResetError, ConnectionAbortedError, OSError):
             if not self.closed:
