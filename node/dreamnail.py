@@ -20,6 +20,7 @@ import threading
 # Implement transaction pool storing (DONE)
 # in setup implement peer and transaction syncing. (DONE)
 
+# Fix threading and rework CHNSYN (WIP)
 # Implement a block creator/editor/miner (NIP)
 # Create a user file system for saving RSA keys (WIP)
 # implement whitedoable env loading that's organized (WIP)
@@ -304,6 +305,11 @@ class Connection:
                 command_message = self.recv()
                 if self.execute_command(command_message):
                     print(f"### Succesfuly executed {command_message} with {self.address}")
+                    #region Check to see if peer's chain is significantly larger than the current one used
+                    if Server.singleton.blockchain.mass  >= self.peer_chain_mass + Server.TRUST_HEIGHT * Server.singleton.difficulty_target:
+                        print(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
+                        chnsyn_thread = threading.Thread(target=self.CHNSYN)
+                        chnsyn_thread.start()
             except Exception as err:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
                 self.close()
@@ -348,20 +354,77 @@ class Connection:
                             raise AssertionError("Value not as client specified")
                     else:
                         self.send("False")
-                        #region Check to see if peer's chain is significantly larger than the current one used
-                        if self.peer_chain_mass >= Server.singleton.blockchain.mass + Server.TRUST_HEIGHT * Server.singleton.difficulty_target:
-                            print(f"### Noticed that {self.address} uses a significantly larger chain (dM-chain = {self.peer_chain_mass - Server.singleton.blockchain.mass} Starting to sync with it")
-                            chnsyn_thread = threading.Thread(target=self.CHNSYN)
-                            chnsyn_thread.start()
                 case "CHNSYN":
-                    peer_chain_mass, peer_chain_len = self.recv().split(' ')
+                    # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
+                    my_chain_mass = Server.singleton.blockchain.mass
+                    my_chain_len = len(Server.singleton.blockchain.chain)
+                    self.send(f"{my_chain_mass}")
+
+                    peer_chain_mass = self.recv()
                     peer_chain_mass = int(peer_chain_mass)
-                    peer_chain_len = int(peer_chain_len)
-                    assert peer_chain_mass >= 0 and peer_chain_len >= 0
+                    assert peer_chain_mass > 0
                     self.peer_chain_mass = peer_chain_mass
 
-                    my_chain_mass = Server.singleton.blockchain.mass
-                    self.send(f"{my_chain_mass}")
+                    if peer_chain_mass < my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
+                        self.send("False")
+                        return
+                    self.send("True")
+                    hashes = []
+                    inventory = []
+                    split_index = 0
+                    while True:
+                        hashes = self.recv().split(' ')
+                        #TODO: DEBUG splicing
+                        for i in range(my_chain_len - len(inventory) - len(hashes), my_chain_len - len(inventory))[::-1]:
+                            if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
+                                split_index = i+1
+                                hashes = []
+                                break
+                            else:
+                                inventory += hashes[i]
+                        if len(hashes) == 100:
+                            self.send("continue")
+                        else:
+                            break
+                    form_new_chain = len(inventory) > 0
+                    # Create the new blockchain object and fill in the known blocks
+                    inventory = inventory[::-1]
+                    if form_new_chain:
+                        new_blockchain = dreamveil.Blockchain()
+                        for i in range(split_index):
+                            new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
+                    else:
+                        new_blockchain = Server.singleton.blockchain
+                    self.send(str(split_index))
+
+                    # Download all the blocks mentioned in the inventory list from the peer
+                    while new_blockchain.mass < peer_chain_mass:
+                        new_bk = dreamveil.Block.loads(self.recv())
+                        chain_result = new_blockchain.chain_block(new_bk)
+
+                        if chain_result:
+                            for transaction in new_bk.transactions:
+                                if "BLOCK" not in transaction.inputs:
+                                    if transaction in Server.singleton.transaction_pool:
+                                        Server.singleton.transaction_pool.remove(transaction)
+                        else:
+                            print(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
+                            if form_new_chain and not new_blockchain is Server.singleton.blockchain:
+                                del new_blockchain
+                            self.close()
+                            return
+                        self.send("continue")
+
+                        # If the given blockchain is indeed larger than the current blockchain used
+                        if new_blockchain.mass == peer_chain_mass and form_new_chain:
+                            # We swap the blockchain objects to the new larger one.
+                            Server.singleton.blockchain = new_blockchain
+                        else:
+                            print(f"!!! Given blockchain mass is not the same as specified by ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
+                            if form_new_chain and not new_blockchain is Server.singleton.blockchain:
+                                del new_blockchain
+                            self.close()
+                    print(f"### With ({self.address}) finished syncing new chain with mass {Server.singleton.blockchain.chain.mass} and length {len(Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
 
                     if self.recv() == "True":
                         hash_batches_sent = 0
@@ -452,76 +515,14 @@ class Connection:
 
     @connection_command
     def CHNSYN(self):
-        # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
-        my_chain_mass = Server.singleton.blockchain.mass
-        my_chain_len = len(Server.singleton.blockchain.chain)
-        self.send(f"{my_chain_mass}")
-
-        peer_chain_mass = self.recv()
+        peer_chain_mass, peer_chain_len = self.recv().split(' ')
         peer_chain_mass = int(peer_chain_mass)
-        assert peer_chain_mass > 0
+        peer_chain_len = int(peer_chain_len)
+        assert peer_chain_mass >= 0 and peer_chain_len >= 0
         self.peer_chain_mass = peer_chain_mass
 
-        if peer_chain_mass < my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
-            self.send("False")
-            return
-        self.send("True")
-        hashes = []
-        inventory = []
-        split_index = 0
-        while True:
-            hashes = self.recv().split(' ')
-            #TODO: DEBUG splicing
-            for i in range(my_chain_len - len(inventory) - len(hashes), my_chain_len - len(inventory))[::-1]:
-                if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
-                    split_index = i+1
-                    hashes = []
-                    break
-                else:
-                    inventory += hashes[i]
-            if len(hashes) == 100:
-                self.send("continue")
-            else:
-                break
-        form_new_chain = len(inventory) > 0
-        # Create the new blockchain object and fill in the known blocks
-        inventory = inventory[::-1]
-        if form_new_chain:
-            new_blockchain = dreamveil.Blockchain()
-            for i in range(split_index):
-                new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
-        else:
-            new_blockchain = Server.singleton.blockchain
-        self.send(str(split_index))
-
-        # Download all the blocks mentioned in the inventory list from the peer
-        while new_blockchain.mass < peer_chain_mass:
-            new_bk = dreamveil.Block.loads(self.recv())
-            chain_result = new_blockchain.chain_block(new_bk)
-
-            if chain_result:
-                for transaction in new_bk.transactions:
-                    if "BLOCK" not in transaction.inputs:
-                        if transaction in Server.singleton.transaction_pool:
-                            Server.singleton.transaction_pool.remove(transaction)
-            else:
-                print(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
-                if form_new_chain and not new_blockchain is Server.singleton.blockchain:
-                    del new_blockchain
-                self.close()
-                return
-            self.send("continue")
-
-            # If the given blockchain is indeed larger than the current blockchain used
-            if new_blockchain.mass == peer_chain_mass and form_new_chain:
-                # We swap the blockchain objects to the new larger one.
-                Server.singleton.blockchain = new_blockchain
-            else:
-                print(f"!!! Given blockchain mass is not the same as specified by ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
-                if form_new_chain and not new_blockchain is Server.singleton.blockchain:
-                    del new_blockchain
-                self.close()
-        print(f"### With ({self.address}) finished syncing new chain with mass {Server.singleton.blockchain.chain.mass} and length {len(Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
+        my_chain_mass = Server.singleton.blockchain.mass
+        self.send(f"{my_chain_mass}")
     #endregion
 
     def close(self, remove_peer=True):
