@@ -1,3 +1,4 @@
+from itertools import chain
 import dreamveil
 import dreamshield
 
@@ -320,9 +321,9 @@ class Connection:
                             self.close()
                 case "SENDBK":
                     bk_prev_hash, bk_hash = json.loads(self.recv())
-                    my_top_bk = Server.singleton.blockchain.chain[-1]
+                    my_top_hash = Server.singleton.blockchain.chain[-1].block_hash if len(Server.singleton.blockchain.chain) > 0 else ''
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
-                    if my_top_bk.block_hash == bk_prev_hash and dreamveil.Block.calculate_block_hash_difficulty(bk_hash) >= Server.singleton.difficulty_target:
+                    if my_top_hash == bk_prev_hash and dreamveil.Block.calculate_block_hash_difficulty(bk_hash) >= Server.singleton.difficulty_target:
                         self.send("True")
                         new_bk = dreamveil.Block.loads(self.recv())
                         if new_bk.block_hash == bk_hash:
