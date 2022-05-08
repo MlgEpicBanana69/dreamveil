@@ -150,11 +150,11 @@ class Transaction:
 
     def dumps(self):
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
-        return repr(information)
+        return json.dumps(information)
 
     def get_contents(self):
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce]
-        return repr(information)
+        return json.dumps(information)
 
     def calculate_efficiency(self):
         return self.get_miner_fee() / to_decimal(len(self.dumps()))
@@ -207,7 +207,7 @@ class Block:
 
     def get_contents(self):
         information = [self.previous_block_hash, self.transactions, self.nonce]
-        return repr(information)
+        return json.dumps(information)
 
     def hash_block(self):
         """
@@ -298,7 +298,7 @@ class Block:
 
     def dumps(self):
         information = [self.previous_block_hash, self.transactions, self.nonce, self.block_hash]
-        return repr(information)
+        return json.dumps(information)
 
     def get_header(self):
         """Returns a short str containing the descriptive variables of the block seperated by space. Used for identification."""
@@ -400,7 +400,7 @@ class Blockchain:
 
     def dumps(self):
         information = [self.chain, self.mass, self.unspent_transactions_tree.dumps()]
-        return repr(information)
+        return json.dumps(information)
 
     @staticmethod
     def loads(json_str):

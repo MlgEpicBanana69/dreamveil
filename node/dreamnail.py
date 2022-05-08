@@ -1,4 +1,3 @@
-from itertools import chain
 import dreamveil
 import dreamshield
 
@@ -49,7 +48,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
         Server.singleton = self
 
-        self.difficulty_target = int(2**11) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**8) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -102,7 +101,7 @@ class Server:
         if self.is_miner:
             self.miner_thread.start()
         while True:
-           print(f"### {len(self.peers)}/{self.max_peer_amount} connected. Current peer pool size: {len(self.peer_pool)}")
+           print(f"### {len(self.peers)}/{self.max_peer_amount} connected. Current peer pool size: {len(self.peer_pool)} Current blockchain length and mass {len(self.blockchain.chain)} {self.blockchain.mass}")
            time.sleep(60)
 
     def seeker(self):
@@ -211,7 +210,8 @@ class Server:
                         if "BLOCK" not in transaction.inputs:
                             if transaction in self.transaction_pool:
                                 self.transaction_pool.remove(transaction)
-                    for peer_connection in self.peers.values():
+                    current_peer_connections = self.peers.values()
+                    for peer_connection in current_peer_connections:
                         action_thread = threading.Thread(target=peer_connection.SENDBK, args=(mined_block,))
                         action_thread.start()
                 else:
@@ -325,7 +325,8 @@ class Connection:
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
                     if my_top_hash == bk_prev_hash and dreamveil.Block.calculate_block_hash_difficulty(bk_hash) >= Server.singleton.difficulty_target:
                         self.send("True")
-                        new_bk = dreamveil.Block.loads(self.recv())
+                        recieved_block_json = self.recv()
+                        new_bk = dreamveil.Block.loads(recieved_block_json)
                         if new_bk.block_hash == bk_hash:
                             if Server.singleton.blockchain.chain_block(new_bk):
                                 for transaction in new_bk.transactions:
@@ -424,7 +425,7 @@ class Connection:
                 self.lock.release()
                 return output
             except Exception as err:
-                print(f"!!! Connection with {self.address} forcibly closed due to failure {err}")
+                print(f"!!! Connection with {self.address} forcibly closed due to failure {err}. {command_func}")
                 self.close()
         return wrapper
 
