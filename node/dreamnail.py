@@ -235,7 +235,6 @@ class Connection:
         self.address = address
         self.closed = False
         self.peer_chain_mass = None
-        self.commanding = False
 
         if address not in Server.singleton.peers:
             Server.singleton.peers[self.address] = self
@@ -415,18 +414,17 @@ class Connection:
 
     def connection_command(command_func):
         def wrapper(self, *args, **kwargs):
+            self.lock.acquire()
             try:
-                self.lock.acquire()
                 self.send(command_func.__name__)
-                self.commanding = True
                 print(f"### Locked {command_func.__name__} in {self.address}")
                 output = command_func(self, *args, **kwargs)
-                self.commanding = False
-                self.lock.release()
                 return output
             except Exception as err:
                 print(f"!!! Connection with {self.address} forcibly closed due to failure {err}. {command_func}")
                 self.close()
+            finally:
+                self.lock.release()
         return wrapper
 
     #region connection commands
