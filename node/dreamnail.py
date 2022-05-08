@@ -112,17 +112,19 @@ class Server:
             # Once connection amount is too low, seek connections if possible.
             while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
                 self.peer_lock.acquire()
-                new_peer = self.roll_peer()
-                if new_peer is not None:
-                    connection_result = self.connect(new_peer)
-                    if connection_result is None:
-                        # TODO: Define peer status system
-                        if peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
-                            peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
-                            print(f"### Marked {new_peer} as OFFLINE")
-                    else:
-                        peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
-                self.peer_lock.release()
+                try:
+                    new_peer = self.roll_peer()
+                    if new_peer is not None:
+                        connection_result = self.connect(new_peer)
+                        if connection_result is None:
+                            # TODO: Define peer status system
+                            if peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
+                                peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
+                                print(f"### Marked {new_peer} as OFFLINE")
+                        else:
+                            peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
+                finally:
+                    self.peer_lock.release()
 
     def accepter(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -135,9 +137,11 @@ class Server:
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
                 self.peer_lock.acquire()
-                Connection(peer_socket, peer_address[0])
-                print(f"### {peer_address[0]} connected to node")
-                self.peer_lock.release()
+                try:
+                    Connection(peer_socket, peer_address[0])
+                    print(f"### {peer_address[0]} connected to node")
+                finally:
+                    self.peer_lock.release()
 
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
@@ -230,21 +234,26 @@ class Connection:
 
     def __init__(self, socket, address):
         Connection.connection_lock.acquire()
-        self.lock = threading.Lock()
-        self.socket = socket
-        self.address = address
-        self.closed = False
-        self.peer_chain_mass = None
+        try:
+            self.lock = threading.Lock()
+            self.lock.acquire()
+            self.socket = socket
+            self.address = address
+            self.closed = False
+            self.peer_chain_mass = None
 
-        if address not in Server.singleton.peers:
-            Server.singleton.peers[self.address] = self
-        else:
+            if address not in Server.singleton.peers:
+                Server.singleton.peers[self.address] = self
+            else:
+                self.close(remove_peer=False)
+                return
+
+            self.setup()
+            self.thread = threading.Thread(target=self.run)
+            self.thread.start()
+        finally:
             Connection.connection_lock.release()
-            self.close(remove_peer=False)
-            return
-
-        self.thread = threading.Thread(target=self.run)
-        self.thread.start()
+            self.lock.release()
 
     def setup(self):
         try:
@@ -276,13 +285,8 @@ class Connection:
             print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
             self.close()
-        finally:
-            Connection.connection_lock.release()
 
     def run(self):
-        self.lock.acquire()
-        self.setup()
-        self.lock.release()
         while not self.closed:
             try:
                 print(f"### Listening to {self.address}...")
@@ -518,7 +522,8 @@ class Connection:
     #endregion
 
     def close(self, remove_peer=True):
-        Connection.connection_lock.acquire()
+        if self.closed:
+            return
         try:
             self.closed = True
             print(f"### Terminated connection with {self.address}")
@@ -526,7 +531,6 @@ class Connection:
                 del Server.singleton.peers[self.address]
         finally:
             self.socket.close()
-            Connection.connection_lock.release()
             del self
 
 def exit_handler():
