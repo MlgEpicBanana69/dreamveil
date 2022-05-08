@@ -189,7 +189,7 @@ class Server:
                 my_chain_len = len(self.blockchain.chain)
                 top_bk_hash = self.blockchain.chain[-1].block_hash if len(self.blockchain.chain) > 0 else ""
                 mined_block = dreamveil.Block(top_bk_hash, [], 0, "")
-                block_reward = dreamveil.to_decimal(self.blockchain.calculate_block_reward(len(self.blockchain.chain)))
+                block_reward = self.blockchain.calculate_block_reward(len(self.blockchain.chain))
                 for pool_transaction in self.transaction_pool:
                     try:
                         block_reward += pool_transaction.get_miner_fee()
@@ -198,7 +198,7 @@ class Server:
                             mined_block.remove_transaction(pool_transaction)
                     except ValueError:
                         break
-                miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": block_reward}, {my_address: block_reward}, self.miner_msg, "", "").sign(self.host_keys)
+                miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, self.miner_msg, "", "").sign(self.host_keys)
                 mined_block.add_transaction(miner_reward_transaction)
 
             if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
@@ -601,7 +601,7 @@ while True:
         except (ValueError, json.JSONDecodeError):
             print("Invalid password!")
 
-server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
+server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], False, port=int(application_config["SERVER"]["port"]))
 
 # Main thread loop
 while True:
