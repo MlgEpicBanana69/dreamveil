@@ -188,7 +188,7 @@ class Server:
                 transaction_pool_len = len(self.transaction_pool)
                 my_chain_len = len(self.blockchain.chain)
                 top_bk_hash = self.blockchain.chain[-1].block_hash if len(self.blockchain.chain) > 0 else ""
-                mined_block = dreamveil.Block(top_bk_hash, [], 0, "")
+                mined_block = dreamveil.Block(top_bk_hash, [], "", "")
                 block_reward = self.blockchain.calculate_block_reward(len(self.blockchain.chain))
                 for pool_transaction in self.transaction_pool:
                     try:

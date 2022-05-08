@@ -1,8 +1,10 @@
 from Crypto.PublicKey import RSA
+from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
 import base64
 import secrets
 import decimal
+import math
 import json
 
 import data_structures
@@ -66,9 +68,9 @@ class Transaction:
         self.nonce = secrets.token_hex(32)
         # Generate the transaction hash (Including the nonce)
         # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
-        transaction_hash = SHA256.new(self.get_contents().encode()).hexdigest()
+        transaction_hash = SHA256.new(self.get_contents().encode())
         # Sign the transaction hash using the RSA private key
-        digital_signature = hex((int(transaction_hash, base=16) ** private_key.d) % private_key.n)[2::]
+        digital_signature = pkcs1_15.new(private_key).sign(transaction_hash).hex()
         # Set and return the generated digital signature
         self.signature = digital_signature
         return self
@@ -78,13 +80,11 @@ class Transaction:
         # TODO DEBUG THIS
         try:
             rsa_public_key = address_to_key(self.sender)
-            computed_signature = SHA256.new(self.dumps().encode()).hexdigest()
-            proposed_signature = hex((int(self.signature, base=16) ** rsa_public_key.e) % rsa_public_key.n)[2::]
-            if secrets.compare_digest(computed_signature, proposed_signature):
-                return True
-        except Exception as err:
-            print(f"Verify signature raised exception {err}: {err.args}")
-        return False
+            computed_hash = SHA256.new(self.get_contents().encode())
+            pkcs1_15.new(rsa_public_key).verify(computed_hash, bytes.fromhex(self.signature))
+            return True
+        except ValueError:
+            return False
 
     def verify_io(self):
         """Checks that IO is both in correct format and maintain currency equality"""
@@ -173,7 +173,7 @@ class Block:
     MAX_SIZE = 2097152 # Maximum block size in bytes (2MB)
 
     def __init__(self, previous_block_hash:str, transactions:list, nonce:str, block_hash:str):
-        assert type(previous_block_hash) == str and type(transactions) == list and type(nonce) == int and type(block_hash) == str
+        assert type(previous_block_hash) == str and type(transactions) == list and type(nonce) == str and type(block_hash) == str
 
         self.previous_block_hash = previous_block_hash
         self.transactions = transactions
