@@ -343,6 +343,9 @@ class Blockchain:
             # Block does not continue our chain
             if block.previous_block_hash != self.chain[-1].block_hash:
                 return False
+        else:
+            if block.previous_block_hash != "":
+                return False
 
         if not self.verify_block(block, len(self.chain)):
             return False
