@@ -308,7 +308,7 @@ class Connection:
                 if command_message == "TERMINATE":
                     self.close()
                     break
-                cmd_thread = threading.Thread(target=self.execute_command)
+                cmd_thread = threading.Thread(target=self.execute_command, args=(command_message,))
                 cmd_thread.start()
             except Exception as err:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
@@ -648,7 +648,7 @@ while True:
         except (ValueError, json.JSONDecodeError):
             print("Invalid password!")
 
-server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
+server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], False, port=int(application_config["SERVER"]["port"]))
 
 # Main thread loop
 while True:
