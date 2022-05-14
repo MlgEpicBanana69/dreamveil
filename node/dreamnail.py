@@ -420,7 +420,7 @@ class Connection:
                 split_index = self.read_last_message()
             split_index = int(split_index)
             assert split_index >= 0 and split_index <= my_chain_len
-            form_new_chain = split_index <= my_chain_len and my_chain_len != 0
+            form_new_chain = split_index < my_chain_len and my_chain_len != 0
 
             # Create the new blockchain object and fill in the known blocks
             if form_new_chain:
@@ -518,9 +518,10 @@ class Connection:
                     if self.read_last_message() == "True":
                         hashes = []
                         split_index = 0
-                        number_of_batches = (peer_chain_len-1)//100 + 1
-                        for batch_number in range(number_of_batches):
+                        while True:
                             hashes = self.read_last_message().split(' ')
+                            if hashes == ['']:
+                                hashes = []
                             assert len(hashes) <= 100
                             for i in range(len(hashes))[::-1]:
                                 # Have we found the split index?
@@ -574,7 +575,6 @@ class Connection:
                 del Server.singleton.peers[self.address]
         finally:
             self.socket.close()
-            del self.socket
             del self
 
 def exit_handler():
