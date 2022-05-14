@@ -20,10 +20,10 @@ import threading
 # TODO TASKS (AMOGUS):
 # Implement transaction pool storing (DONE)
 # in setup implement peer and transaction syncing. (DONE)
+# Create a user file system for saving RSA keys (DONE)
+# Implement a block creator/editor/miner (DONE)
+# Fix threading and rework CHNSYN (DONE)
 
-# Fix threading and rework CHNSYN (WIP)
-# Implement a block creator/editor/miner (NIP)
-# Create a user file system for saving RSA keys (WIP)
 # implement whitedoable env loading that's organized (WIP)
 # implement online communication-wide encryption (integrity and confidentiallity) (NIP)
 # implement a changing PoW difficulty (NIP)
