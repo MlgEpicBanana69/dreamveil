@@ -150,7 +150,7 @@ class Server:
             try:
                 peer_socket.connect((address, self.port))
             except (TimeoutError, OSError) as err:
-                print(f"!!! Failed to connect to {address} due to {err}")
+                print(f"!!! Failed to connect to {address} due to {type(err)}")
                 return None
             new_peer = Connection(peer_socket, address)
             print(f"### Server connected to {address}")
@@ -557,7 +557,7 @@ class Connection:
                         # We are not interested in the chain of the peer.
                         self.send("False")
             print(f"### Succesfuly executed {command} with {self.address}")
-            if Server.singleton.blockchain.mass < self.peer_chain_mass + Server.TRUST_HEIGHT * Server.singleton.difficulty_target:
+            if Server.singleton.blockchain.mass + Server.TRUST_HEIGHT * Server.singleton.difficulty_target <= self.peer_chain_mass:
                     print(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
