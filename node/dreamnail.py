@@ -360,6 +360,7 @@ class Connection:
             self.lock.acquire()
             try:
                 print(f"### Locked {command_func.__name__} in {self.address}")
+                self.send(command_func.__name__)
                 output = command_func(self, *args, **kwargs)
                 return output
             except Exception as err:
