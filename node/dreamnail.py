@@ -407,40 +407,27 @@ class Connection:
 
         if peer_chain_mass > my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
             self.send("True")
-            hashes = []
-            inventory = [] # Blocks that we don't have
-            split_index = 0
-            while True:
-                hashes = self.read_last_message().split(' ')
-                if hashes == ['']:
-                    hashes = []
-                assert len(hashes) <= 100
-                #TODO: DEBUG splicing
-                for i in range(my_chain_len - len(inventory) - len(hashes), my_chain_len - len(inventory))[::-1]:
-                    # Have we found the split index?
-                    if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
-                        split_index = i+1
-                        # We don't need the rest of the hashes as by definition we have them.
-                        hashes = []
-                        break
-                    else:
-                        # Add current hash to the inventory
-                        inventory.append(hashes[i])
-                if len(hashes) == 100:
-                    # There could still be more hashes to send.
-                    self.send("continue")
-                else:
-                    break
-            form_new_chain = len(inventory) > 0
+
+            hash_batches_sent = 0
+            split_index = "continue"
+            while split_index == "continue":
+                # We send a block hash batch to the peer (max length 100)
+                # The peer will match the hashes against his own chain to find where they split
+                # Repeats this proccess until the split is found.
+                hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
+                self.send(" ".join(hash_batch))
+                split_index = self.read_last_message()
+            split_index = int(split_index)
+            assert split_index >= 0 and split_index <= my_chain_len
+            form_new_chain = split_index <= my_chain_len and my_chain_len != 0
+
             # Create the new blockchain object and fill in the known blocks
-            inventory = inventory[::-1]
             if form_new_chain:
                 new_blockchain = dreamveil.Blockchain()
                 for i in range(split_index):
                     new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
             else:
                 new_blockchain = Server.singleton.blockchain
-            self.send(str(split_index))
 
             # Download all the blocks mentioned in the inventory list from the peer
             try:
@@ -528,24 +515,26 @@ class Connection:
                     self.send(f"{my_chain_mass}")
 
                     if self.read_last_message() == "True":
-                        hash_batches_sent = 0
+                        hashes = []
+                        split_index = 0
                         while True:
-                            # We send a block hash batch to the peer.
-                            # Each batch is at maximum 100 hashes seperated by space.
-                            # We only share blocks that could alternate the peer's chain
-                            # that it, we start at the height of the peer's top block and go down
-                            # We are looking for the height where the chains split.
-                            # That point is where the chains start being equal.
-                            # Peer_Bn == Our_Bn
-                            # If no height was found, that means that the two chains are fundementally different.
-                            # That would mean that all of the peer's chain must be replaced.
-                            hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[:peer_chain_len:][::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
-                            self.send(" ".join(hash_batch))
-                            split_index = self.read_last_message()
-                            if split_index != "continue":
+                            hashes = self.read_last_message().split(' ')
+                            if hashes == ['']:
+                                hashes = []
+                            assert len(hashes) <= 100
+                            for i in range(peer_chain_len)[::-1]:
+                                # Have we found the split index?
+                                if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
+                                    split_index = i+1
+                                    hashes = []
+                                    break
+                            if len(hashes) == 100:
+                                # There could still be more hashes to send.
+                                self.send("continue")
+                            else:
                                 break
-                        split_index = int(split_index)
-                        assert split_index >= 0 and split_index <= peer_chain_len
+                        self.send(str(split_index))
+
                         blocks_sent = 0
                         for block in Server.singleton.blockchain.chain[split_index::]:
                             self.send(block.dumps())
