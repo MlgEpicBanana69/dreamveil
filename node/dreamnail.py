@@ -63,6 +63,7 @@ class Server:
         self.transaction_pool = transaction_pool
         self.is_miner = is_miner
         self.peer_lock = threading.Lock()
+        self.chain_lock = threading.Lock()
         if len(self.blockchain.chain) == 0:
             self.miner_msg = dreamveil.Blockchain.GENESIS_MESSAGE
         else:
@@ -222,6 +223,7 @@ class Server:
         """Attempts to chain a given block to the current blockchain.
         On success sends the block to all connected peers.
         Will not share with peer addresses given in :exclusions:"""
+        self.chain_lock.acquire()
         try:
             if self.blockchain.chain_block(block):
                 print(f"### SUCCESFULY CHAINED BLOCK {block.block_hash}")
@@ -241,6 +243,8 @@ class Server:
                 return False
         except KeyError:
             return False
+        finally:
+            self.chain_lock.release()
 
 class Connection:
     COMMAND_SIZE = 6
@@ -373,6 +377,7 @@ class Connection:
             except Exception as err:
                 print(f"!!! Failed commanding {self.address} due to error {err}. {command_func}")
             finally:
+                time.sleep(0.05)
                 print(f"{command_func} finished {self.address}")
                 self.lock.release()
         return wrapper
