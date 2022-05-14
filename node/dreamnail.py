@@ -323,12 +323,16 @@ class Connection:
         return output
 
     def send(self, message:str):
-        assert len(message) <= Connection.MAX_MESSAGE_SIZE
+        try:
+            assert len(message) <= Connection.MAX_MESSAGE_SIZE
 
-        print(f"### Sending message to ({self.address}): {message}")
-        if not self.closed:
-            message = str(len(message)).zfill(Connection.HEADER_LEN) + message
-            self.socket.send(message.encode())
+            print(f"### Sending message to ({self.address}): {message}")
+            if not self.closed:
+                message = str(len(message)).zfill(Connection.HEADER_LEN) + message
+                self.socket.send(message.encode())
+        except:
+            self.close()
+            return
 
     def recv(self):
         try:
@@ -367,10 +371,72 @@ class Connection:
 
     #region connection commands
     @connection_command
+    def SENDTX(self, transaction:dreamveil.Transaction):
+        self.send(transaction.signature)
+        ans = self.read_last_message()
+        if ans == "True":
+            self.send(transaction.dumps())
+
+    @connection_command
+    def SENDBK(self, block:dreamveil.Block):
+        self.send(block.get_header())
+        ans = self.read_last_message()
+        if ans == "True":
+            self.send(block.dumps())
+
+    @connection_command
+    def CHNSYN(self):
+        peer_chain_mass, peer_chain_len = self.read_last_message().split(' ')
+        peer_chain_mass = int(peer_chain_mass)
+        peer_chain_len = int(peer_chain_len)
+        assert peer_chain_mass >= 0 and peer_chain_len >= 0
+        self.peer_chain_mass = peer_chain_mass
+
+        my_chain_mass = Server.singleton.blockchain.mass
+        self.send(f"{my_chain_mass}")
+
+        if self.read_last_message() == "True":
+            hash_batches_sent = 0
+            while True:
+                # We send a the block hash batch to the peer.
+                # Each batch is at maximum 100 hashes seperated by space.
+                # We only share blocks that could alternate the peer's chain
+                # that it, we start at the height of the peer's top block and go down
+                # We are looking for the height where the chains split.
+                # That point is where the chains start being equal.
+                # Peer_Bn == Our_Bn
+                # If no height was found, that means that the two chains are fundementally different.
+                # That would mean that all of the peer's chain must be replaced.
+                hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[:peer_chain_len:][::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
+                if len(hash_batch) > 0:
+                    self.send(" ".join(hash_batch))
+                    split_index = self.read_last_message()
+                    if split_index != "continue":
+                        break
+                else:
+                    raise AssertionError(f"!!! hash_batch came out empty while helping {self.address} to sync!")
+            split_index = int(split_index)
+            assert split_index >= 0 and split_index <= peer_chain_len
+            blocks_sent = 0
+            for block in Server.singleton.blockchain.chain[split_index::]:
+                self.send(block.dumps())
+                blocks_sent+=1
+                if self.read_last_message() != "continue":
+                    print(f"Failed to CHNSYN with {self.address} while giving blocks!")
+                    self.close()
+                    return
+            # Update the peer chain after the sync.
+            self.peer_chain_mass = my_chain_mass
+            print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
+        else:
+            print(f"### Peer {self.address} refused chain sync.")
+    #endregion
+
     def execute_command(self, command:str):
         commands = ("SENDTX", "SENDBK", "CHNSYN")
         if len(command) < Connection.COMMAND_SIZE or command not in commands:
                 return False
+        self.lock.acquire()
         try:
             # I GOT ...
             match command:
@@ -494,68 +560,8 @@ class Connection:
             log_str += f"Error that was caught: {command_err}"
             print(log_str)
             return False
-
-    @connection_command
-    def SENDTX(self, transaction:dreamveil.Transaction):
-        self.send(transaction.signature)
-        ans = self.read_last_message()
-        if ans == "True":
-            self.send(transaction.dumps())
-
-    @connection_command
-    def SENDBK(self, block:dreamveil.Block):
-        self.send(block.get_header())
-        ans = self.read_last_message()
-        if ans == "True":
-            self.send(block.dumps())
-
-    @connection_command
-    def CHNSYN(self):
-        peer_chain_mass, peer_chain_len = self.read_last_message().split(' ')
-        peer_chain_mass = int(peer_chain_mass)
-        peer_chain_len = int(peer_chain_len)
-        assert peer_chain_mass >= 0 and peer_chain_len >= 0
-        self.peer_chain_mass = peer_chain_mass
-
-        my_chain_mass = Server.singleton.blockchain.mass
-        self.send(f"{my_chain_mass}")
-
-        if self.read_last_message() == "True":
-            hash_batches_sent = 0
-            while True:
-                # We send a the block hash batch to the peer.
-                # Each batch is at maximum 100 hashes seperated by space.
-                # We only share blocks that could alternate the peer's chain
-                # that it, we start at the height of the peer's top block and go down
-                # We are looking for the height where the chains split.
-                # That point is where the chains start being equal.
-                # Peer_Bn == Our_Bn
-                # If no height was found, that means that the two chains are fundementally different.
-                # That would mean that all of the peer's chain must be replaced.
-                hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[:peer_chain_len:][::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
-                if len(hash_batch) > 0:
-                    self.send(" ".join(hash_batch))
-                    split_index = self.read_last_message()
-                    if split_index != "continue":
-                        break
-                else:
-                    raise AssertionError(f"!!! hash_batch came out empty while helping {self.address} to sync!")
-            split_index = int(split_index)
-            assert split_index >= 0 and split_index <= peer_chain_len
-            blocks_sent = 0
-            for block in Server.singleton.blockchain.chain[split_index::]:
-                self.send(block.dumps())
-                blocks_sent+=1
-                if self.read_last_message() != "continue":
-                    print(f"Failed to CHNSYN with {self.address} while giving blocks!")
-                    self.close()
-                    return
-            # Update the peer chain after the sync.
-            self.peer_chain_mass = my_chain_mass
-            print(f"Succesfully helped {self.address} sync up! Sent {blocks_sent} blocks.")
-        else:
-            print(f"### Peer {self.address} refused chain sync.")
-    #endregion
+        finally:
+            self.lock.release()
 
     def close(self, remove_peer=True):
         if self.closed:
@@ -642,7 +648,7 @@ while True:
         except (ValueError, json.JSONDecodeError):
             print("Invalid password!")
 
-server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], False, port=int(application_config["SERVER"]["port"]))
+server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
 
 # Main thread loop
 while True:
