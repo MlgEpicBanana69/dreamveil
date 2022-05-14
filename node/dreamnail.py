@@ -337,7 +337,7 @@ class Connection:
         try:
             assert len(message) <= Connection.MAX_MESSAGE_SIZE
 
-            #print(f"### Sending message to ({self.address}): {message}")
+            print(f"### Sending message to ({self.address}): {message}")
             if not self.closed:
                 message = str(len(message)).zfill(Connection.HEADER_LEN) + message
                 self.socket.send(message.encode())
@@ -360,7 +360,7 @@ class Connection:
                 print(f"Recieved invalid message from ({self.address})")
                 self.close()
                 return
-            #print(f"### Recieved message from ({self.address}): {message_contents}")
+            print(f"### Recieved message from ({self.address}): {message_contents}")
             return message_contents
         except (ConnectionResetError, ConnectionAbortedError, OSError):
             if not self.closed:
