@@ -8,6 +8,7 @@ import secrets
 import json
 import random
 import math
+import timeit
 import atexit
 import time
 import getpass
@@ -318,9 +319,12 @@ class Connection:
                 self.close()
 
     def read_last_message(self):
+        start = timeit.default_timer()
         while self.last_message is None:
             if self.closed:
                 return
+            if timeit.default_timer() - start >= 10.0:
+                raise TimeoutError("Did not recieve answer from peer")
         output = self.last_message
         self.last_message = None
         return output
@@ -368,7 +372,6 @@ class Connection:
                 return output
             except Exception as err:
                 print(f"!!! Failed commanding {self.address} due to error {err}. {command_func}")
-                self.close()
             finally:
                 print(f"{command_func} finished {self.address}")
                 self.lock.release()
