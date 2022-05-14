@@ -50,7 +50,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
         Server.singleton = self
 
-        self.difficulty_target = int(2**8) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**12) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -518,20 +518,22 @@ class Connection:
                     self.peer_chain_mass = peer_chain_mass
 
                     my_chain_mass = Server.singleton.blockchain.mass
+                    my_chain_len  = len(Server.singleton.blockchain.chain)
                     self.send(f"{my_chain_mass}")
 
                     if self.read_last_message() == "True":
                         hashes = []
                         split_index = 0
+                        batches_recieved = 0
                         while True:
                             hashes = self.read_last_message().split(' ')
                             if hashes == ['']:
                                 hashes = []
                             assert len(hashes) <= 100
-                            for i in range(len(hashes))[::-1]:
+                            for i in range(min(len(hashes), len(my_chain_len)))[::-1]:
                                 # Have we found the split index?
                                 if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
-                                    split_index = i+1
+                                    split_index = (peer_chain_len//100 - batches_recieved*100) + i+1
                                     hashes = []
                                     break
                             if len(hashes) == 100:
@@ -539,6 +541,7 @@ class Connection:
                                 self.send("continue")
                             else:
                                 break
+                            batches_recieved += 1
                         self.send(str(split_index))
 
                         blocks_sent = 0
