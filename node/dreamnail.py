@@ -345,11 +345,11 @@ class Connection:
         try:
             message = self.socket.recv(Connection.MAX_MESSAGE_SIZE).decode()
             try:
-                assert len(message) > Connection.HEADER_LEN
+                assert len(message) >= Connection.HEADER_LEN
                 message_len = message[:Connection.HEADER_LEN]
                 assert len(message_len) == Connection.HEADER_LEN
                 message_len = int(message_len)
-                assert message_len > 0
+                assert message_len >= 0
                 message_contents = message[Connection.HEADER_LEN:Connection.HEADER_LEN + message_len]
                 assert len(message_contents) == message_len
             except (ValueError, AssertionError):
@@ -412,6 +412,8 @@ class Connection:
             split_index = 0
             while True:
                 hashes = self.read_last_message().split(' ')
+                if hashes == ['']:
+                    hashes = []
                 assert len(hashes) <= 100
                 #TODO: DEBUG splicing
                 for i in range(my_chain_len - len(inventory) - len(hashes), my_chain_len - len(inventory))[::-1]:
@@ -423,12 +425,11 @@ class Connection:
                         break
                     else:
                         # Add current hash to the inventory
-                        inventory += hashes[i]
+                        inventory.append(hashes[i])
                 if len(hashes) == 100:
                     # There could still be more hashes to send.
                     self.send("continue")
                 else:
-                    self.send(str(split_index))
                     break
             form_new_chain = len(inventory) > 0
             # Create the new blockchain object and fill in the known blocks
@@ -462,7 +463,7 @@ class Connection:
 
                 # We swap the blockchain objects to the new larger one.
                 Server.singleton.blockchain = new_blockchain
-                print(f"### With ({self.address}) finished syncing new chain with mass {Server.singleton.blockchain.chain.mass} and length {len(Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
+                print(f"### With ({self.address}) finished syncing new chain with mass {Server.singleton.blockchain.mass} and length {len(Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
             except Exception as err:
                 print(f"!!! Error {err} while getting blocks from peer in CHNSYN ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
                 if form_new_chain and not new_blockchain is Server.singleton.blockchain:
@@ -658,7 +659,7 @@ while True:
         except (ValueError, json.JSONDecodeError):
             print("Invalid password!")
 
-server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], False, port=int(application_config["SERVER"]["port"]))
+server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
 
 # Main thread loop
 while True:
