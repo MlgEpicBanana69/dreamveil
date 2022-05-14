@@ -550,7 +550,7 @@ class Connection:
                         print(f"### Peer {self.address} refused chain sync.")
                         print(f"### Succesfuly executed {command} with {self.address}")
             print(f"### Succesfuly executed {command} with {self.address}")
-            if peer_chain_mass > my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
+            if self.peer_chain_mass > Server.singleton.blockchain.mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
                     print(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
