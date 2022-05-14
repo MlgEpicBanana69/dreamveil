@@ -516,7 +516,7 @@ class Connection:
                     else:
                         self.send("False")
                 case "CHNSYN":
-                    """Syncs the peer with our larger blockchain"""
+                    """Syncs peer with our larger blockchain"""
                     peer_chain_mass, peer_chain_len = self.read_last_message().split(' ')
                     peer_chain_mass = int(peer_chain_mass)
                     peer_chain_len = int(peer_chain_len)
