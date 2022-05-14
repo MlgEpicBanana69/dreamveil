@@ -370,6 +370,7 @@ class Connection:
                 print(f"!!! Failed commanding {self.address} due to error {err}. {command_func}")
                 self.close()
             finally:
+                print(f"{command_func} finished {self.address}")
                 self.lock.release()
         return wrapper
 
@@ -393,7 +394,7 @@ class Connection:
         peer_chain_mass, peer_chain_len = self.read_last_message().split(' ')
         peer_chain_mass = int(peer_chain_mass)
         peer_chain_len = int(peer_chain_len)
-        assert peer_chain_mass >= 0 and peer_chain_len >= 0
+        assert peer_chain_mass > 0 and peer_chain_len > 0
         self.peer_chain_mass = peer_chain_mass
 
         my_chain_mass = Server.singleton.blockchain.mass
@@ -486,7 +487,7 @@ class Connection:
 
                     peer_chain_mass = self.read_last_message()
                     peer_chain_mass = int(peer_chain_mass)
-                    assert peer_chain_mass > 0
+                    assert peer_chain_mass >= 0
                     self.peer_chain_mass = peer_chain_mass
 
                     if peer_chain_mass > my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
