@@ -435,9 +435,12 @@ class Connection:
 
     def execute_command(self, command:str):
         commands = ("SENDTX", "SENDBK", "CHNSYN")
+        if command is None:
+            raise Exception("??? DEBUG")
         if len(command) < Connection.COMMAND_SIZE or command not in commands:
                 return False
         self.lock.acquire()
+        self.last_message = None
         try:
             # I GOT ...
             match command:
@@ -551,7 +554,7 @@ class Connection:
                         # We are not interested in the chain of the peer.
                         self.send("False")
             print(f"### Succesfuly executed {command} with {self.address}")
-            if Server.singleton.blockchain.mass  >= self.peer_chain_mass + Server.TRUST_HEIGHT * Server.singleton.difficulty_target:
+            if Server.singleton.blockchain.mass < self.peer_chain_mass + Server.TRUST_HEIGHT * Server.singleton.difficulty_target:
                     print(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
