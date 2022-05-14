@@ -218,6 +218,9 @@ class Server:
                 mined_block.mine()
 
     def try_chain_block(self, block, exclusions=[]):
+        """Attempts to chain a given block to the current blockchain.
+        On success sends the block to all connected peers.
+        Will not share with peer addresses given in :exclusions:"""
         try:
             if self.blockchain.chain_block(block):
                 print(f"### SUCCESFULY CHAINED BLOCK {block.block_hash}")
@@ -436,9 +439,9 @@ class Connection:
     def execute_command(self, command:str):
         commands = ("SENDTX", "SENDBK", "CHNSYN")
         if command is None:
-            raise Exception("??? DEBUG")
+            return False
         if len(command) < Connection.COMMAND_SIZE or command not in commands:
-                return False
+            return False
         self.lock.acquire()
         self.last_message = None
         try:
@@ -470,7 +473,7 @@ class Connection:
                         recieved_block_json = self.read_last_message()
                         new_bk = dreamveil.Block.loads(recieved_block_json)
                         if new_bk.block_hash == bk_hash:
-                            Server.singleton.try_chain_block(exclusions=self.address)
+                            Server.singleton.try_chain_block(new_bk, exclusions=self.address)
                         else:
                             raise AssertionError("Value not as client specified")
                     else:
