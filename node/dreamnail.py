@@ -415,6 +415,7 @@ class Connection:
                 # The peer will match the hashes against his own chain to find where they split
                 # Repeats this proccess until the split is found.
                 hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
+                hash_batch = hash_batch[::-1]
                 self.send(" ".join(hash_batch))
                 split_index = self.read_last_message()
             split_index = int(split_index)
@@ -517,12 +518,11 @@ class Connection:
                     if self.read_last_message() == "True":
                         hashes = []
                         split_index = 0
-                        while True:
+                        number_of_batches = (peer_chain_len-1)//100 + 1
+                        for batch_number in range(number_of_batches):
                             hashes = self.read_last_message().split(' ')
-                            if hashes == ['']:
-                                hashes = []
                             assert len(hashes) <= 100
-                            for i in range(peer_chain_len)[::-1]:
+                            for i in range(len(hashes))[::-1]:
                                 # Have we found the split index?
                                 if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
                                     split_index = i+1
