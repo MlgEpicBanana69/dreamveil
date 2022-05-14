@@ -308,10 +308,10 @@ class Connection:
             try:
                 print(f"### Listening to {self.address}...")
                 command_message = self.recv()
-                self.last_message = command_message
                 if command_message == "TERMINATE":
                     self.close()
                     break
+                self.last_message = command_message
                 cmd_thread = threading.Thread(target=self.execute_command, args=(command_message,))
                 cmd_thread.start()
             except Exception as err:
@@ -539,13 +539,10 @@ class Connection:
                             # If no height was found, that means that the two chains are fundementally different.
                             # That would mean that all of the peer's chain must be replaced.
                             hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[:peer_chain_len:][::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
-                            if len(hash_batch) > 0:
-                                self.send(" ".join(hash_batch))
-                                split_index = self.read_last_message()
-                                if split_index != "continue":
-                                    break
-                            else:
-                                raise AssertionError(f"!!! hash_batch came out empty while helping {self.address} to sync!")
+                            self.send(" ".join(hash_batch))
+                            split_index = self.read_last_message()
+                            if split_index != "continue":
+                                break
                         split_index = int(split_index)
                         assert split_index >= 0 and split_index <= peer_chain_len
                         blocks_sent = 0
