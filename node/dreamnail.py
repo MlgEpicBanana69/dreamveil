@@ -152,7 +152,7 @@ class Server:
             try:
                 peer_socket.connect((address, self.port))
             except (TimeoutError, OSError) as err:
-                print(f"!!! Failed to connect to {address} due to {type(err)}")
+                #print(f"!!! Failed to connect to {address} due to {type(err)}: {err.args[1]}")
                 return None
             new_peer = Connection(peer_socket, address)
             print(f"### Server connected to {address}")
