@@ -262,6 +262,8 @@ class Connection:
             self.address = address
             self.closed = False
             self.peer_chain_mass = None
+            self.completed_setup = False
+            self.first_to_move = Server.singleton.address > address
 
             if address not in Server.singleton.peers:
                 Server.singleton.peers[self.address] = self
@@ -269,9 +271,9 @@ class Connection:
                 self.close(remove_peer=False)
                 return
 
-            self.setup()
             self.run_thread = threading.Thread(target=self.run)
             self.run_thread.start()
+            self.setup()
         finally:
             Connection.connection_lock.release()
             self.lock.release()
@@ -279,21 +281,33 @@ class Connection:
     def setup(self):
         try:
             # Check that node versions match
-            self.send(Server.singleton.version)
-            peer_version = self.recv()
+            if self.first_to_move:
+                self.send(Server.singleton.version)
+                peer_version = self.read_last_message()
+            else:
+                peer_version = self.read_last_message()
+                self.send(Server.singleton.version)
             assert peer_version == Server.singleton.version
 
             # Exchange chain masses
-            self.send(f"{Server.singleton.blockchain.mass}")
-            peer_chain_mass = self.recv()
+            if self.first_to_move:
+                self.send(f"{Server.singleton.blockchain.mass}")
+                peer_chain_mass = self.read_last_message()
+            else:
+                peer_chain_mass = self.read_last_message()
+                self.send(f"{Server.singleton.blockchain.mass}")
             peer_chain_mass = int(peer_chain_mass)
             assert peer_chain_mass >= 0
             self.peer_chain_mass = peer_chain_mass
 
             # Send and recieve 100 random peers to further establish the connection of nodes into the network
             peers_to_share = random.sample(list(Server.singleton.peer_pool.keys()), min(100, len(Server.singleton.peer_pool)))
-            self.send(json.dumps(peers_to_share))
-            newly_given_peers = self.recv()
+            if self.first_to_move:
+                self.send(json.dumps(peers_to_share))
+                newly_given_peers = self.read_last_message()
+            else:
+                newly_given_peers = self.read_last_message()
+                self.send(json.dumps(peers_to_share))
             newly_given_peers = json.loads(newly_given_peers)
             assert len(newly_given_peers) <= 100 and type(newly_given_peers) == list
             for peer in newly_given_peers:
@@ -316,8 +330,9 @@ class Connection:
                     self.close()
                     break
                 self.last_message = command_message
-                cmd_thread = threading.Thread(target=self.execute_command, args=(command_message,))
-                cmd_thread.start()
+                if self.completed_setup:
+                    cmd_thread = threading.Thread(target=self.execute_command, args=(command_message,))
+                    cmd_thread.start()
             except Exception as err:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
                 self.close()
@@ -530,7 +545,7 @@ class Connection:
                             if hashes == ['']:
                                 hashes = []
                             assert len(hashes) <= 100
-                            for i in range(min(len(hashes), len(my_chain_len)))[::-1]:
+                            for i in range(min(len(hashes), my_chain_len))[::-1]:
                                 # Have we found the split index?
                                 if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
                                     split_index = (peer_chain_len//100 - batches_recieved*100) + i+1
