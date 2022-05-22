@@ -281,6 +281,7 @@ class Connection:
     def setup(self):
         try:
             # Check that node versions match
+            peer_version = None
             if self.first_to_move:
                 self.send(Server.singleton.version)
                 peer_version = self.read_last_message()
@@ -316,6 +317,7 @@ class Connection:
                     Server.singleton.peer_pool[peer] = Server.PEER_STATUS_UNKNOWN
 
             print(f"### Connection with {self.address} completed setup (version: {peer_version})")
+            self.completed_setup = True
         except (AssertionError, TimeoutError, ValueError) as err:
             print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
@@ -324,7 +326,6 @@ class Connection:
     def run(self):
         while not self.closed:
             try:
-                print(f"### Listening to {self.address}...")
                 command_message = self.recv()
                 if command_message == "TERMINATE":
                     self.close()
