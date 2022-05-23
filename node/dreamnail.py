@@ -273,7 +273,7 @@ class Connection:
             peer_version = None
             if self.first_to_move:
                 self.send(Server.singleton.version)
-                peer_version = self.read_last_message()
+                peer_version = self.read_last_message(60.0)
             else:
                 peer_version = self.read_last_message()
                 self.send(Server.singleton.version)
@@ -410,15 +410,15 @@ class Connection:
     @connection_command
     def CHNSYN(self):
         """Syncs ourselves with the peer's larger chain"""
-        peer_chain_mass = self.read_last_message(60.0)
+        peer_chain_mass = self.read_last_message()
         peer_chain_mass = int(peer_chain_mass)
         assert peer_chain_mass > 0
         self.peer_chain_mass = peer_chain_mass
+        my_chain_mass = Server.singleton.blockchain.mass
+        my_chain_len = len(Server.singleton.blockchain.chain)
 
         if peer_chain_mass > my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
             # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
-            my_chain_mass = Server.singleton.blockchain.mass
-            my_chain_len = len(Server.singleton.blockchain.chain)
             self.send(f"{my_chain_mass} {my_chain_len}")
             assert self.read_last_message() == "ACK"
             hash_batches_sent = 0
