@@ -256,7 +256,6 @@ class Connection:
         Connection.connection_lock.acquire()
         try:
             self.lock = threading.Lock()
-            self.lock.acquire()
             self.last_message = None
             self.socket = socket
             self.address = address
@@ -273,13 +272,13 @@ class Connection:
 
             self.run_thread = threading.Thread(target=self.run)
             self.run_thread.start()
-            self.setup()
         finally:
             Connection.connection_lock.release()
-            self.lock.release()
+        self.setup()
 
     def setup(self):
         try:
+            self.lock.acquire()
             # Check that node versions match
             peer_version = None
             if self.first_to_move:
@@ -322,6 +321,8 @@ class Connection:
             print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
             # Terminate the connection
             self.close()
+        finally:
+            self.lock.release()
 
     def run(self):
         while not self.closed:
@@ -353,11 +354,12 @@ class Connection:
         try:
             assert len(message) <= Connection.MAX_MESSAGE_SIZE
 
- #           print(f"### Sending message to ({self.address}): {message}")
+            print(f"### Sending message to ({self.address}): {message}")
             if not self.closed:
                 message = str(len(message)).zfill(Connection.HEADER_LEN) + message
                 self.socket.send(message.encode())
-        except:
+        except Exception as err:
+            print(f"Failed to send message to {self.address} due to error: {type(err)}: {err.args}")
             self.close()
             return
 
@@ -376,7 +378,7 @@ class Connection:
                 print(f"Recieved invalid message from ({self.address})")
                 self.close()
                 return
-   #         print(f"### Recieved message from ({self.address}): {message_contents}")
+            print(f"### Recieved message from ({self.address}): {message_contents}")
             return message_contents
         except (ConnectionResetError, ConnectionAbortedError, OSError):
             if not self.closed:
