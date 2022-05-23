@@ -50,7 +50,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
         Server.singleton = self
 
-        self.difficulty_target = int(2**12) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**8) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -431,6 +431,7 @@ class Connection:
                 # We send a block hash batch to the peer (max length 100)
                 # The peer will match the hashes against his own chain to find where they split
                 # Repeats this proccess until the split is found.
+                # split_index: index on the chain where the blocks are different but on split_index-1 are the same for both chains.
                 hash_batch = [block.block_hash for block in Server.singleton.blockchain.chain[::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
                 hash_batch = hash_batch[::-1]
                 self.send(" ".join(hash_batch))
@@ -442,7 +443,7 @@ class Connection:
             # Create the new blockchain object and fill in the known blocks
             if form_new_chain:
                 new_blockchain = dreamveil.Blockchain()
-                for i in range(split_index+1):
+                for i in range(split_index):
                     new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
             else:
                 new_blockchain = Server.singleton.blockchain
