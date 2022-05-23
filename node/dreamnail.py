@@ -315,6 +315,11 @@ class Connection:
             self.lock.release()
 
     def run(self):
+        if self.peer_chain_mass > Server.singleton.blockchain.mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
+                print(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
+                chnsyn_thread = threading.Thread(target=self.CHNSYN)
+                chnsyn_thread.start()
+
         while not self.closed:
             try:
                 command_message = self.recv()
@@ -547,7 +552,7 @@ class Connection:
                             hashes = hashes[:max(0, my_chain_len - batches_recieved*100)]
                             for i in range(len(hashes))[::-1]:
                                 # Have we found the split index?
-                                split_index = batches_recieved*100 + i
+                                split_index = batches_recieved*100 + i + 1
                                 if Server.singleton.blockchain.chain[split_index-1].block_hash == hashes[i]:
                                     hashes = []
                                     break
@@ -564,7 +569,8 @@ class Connection:
                         for block in Server.singleton.blockchain.chain[split_index::]:
                             self.send(block.dumps())
                             blocks_sent+=1
-                            if self.read_last_message() != "continue":
+                            resp = self.read_last_message()
+                            if resp != "continue":
                                 print(f"Failed to CHNSYN with {self.address} while giving blocks!")
                                 self.close()
                                 return
