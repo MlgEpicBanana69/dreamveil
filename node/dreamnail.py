@@ -62,7 +62,6 @@ class Server:
         self.peer_pool = peer_pool
         self.transaction_pool = transaction_pool
         self.is_miner = is_miner
-        self.peer_lock = threading.Lock()
         self.chain_lock = threading.Lock()
         if len(self.blockchain.chain) == 0:
             self.miner_msg = dreamveil.Blockchain.GENESIS_MESSAGE
@@ -114,20 +113,16 @@ class Server:
         while not self.closed:
             # Once connection amount is too low, seek connections if possible.
             while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
-                self.peer_lock.acquire()
-                try:
-                    new_peer = self.roll_peer()
-                    if new_peer is not None:
-                        connection_result = self.connect(new_peer)
-                        if connection_result is None:
-                            # TODO: Define peer status system
-                            if peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
-                                peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
-                                print(f"### Marked {new_peer} as OFFLINE")
-                        else:
-                            peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
-                finally:
-                    self.peer_lock.release()
+                new_peer = self.roll_peer()
+                if new_peer is not None:
+                    connection_result = self.connect(new_peer)
+                    if connection_result is None:
+                        # TODO: Define peer status system
+                        if peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
+                            peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
+                            print(f"### Marked {new_peer} as OFFLINE")
+                    else:
+                        peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
 
     def accepter(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -139,12 +134,8 @@ class Server:
             # Do not accept new connections once peer count exceeds maximum allowed
             while len(self.peers) < self.max_peer_amount and not self.closed:
                 peer_socket, peer_address = self.socket.accept()
-                self.peer_lock.acquire()
-                try:
-                    Connection(peer_socket, peer_address[0])
-                    print(f"### {peer_address[0]} connected to node")
-                finally:
-                    self.peer_lock.release()
+                Connection(peer_socket, peer_address[0])
+                print(f"### {peer_address[0]} connected to node")
 
     def connect(self, address):
         if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
