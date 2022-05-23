@@ -554,7 +554,7 @@ class Connection:
                             hashes = hashes[:max(0, my_chain_len - batches_recieved*100)]
                             for i in range(len(hashes))[::-1]:
                                 # Have we found the split index?
-                                if Server.singleton.blockchain.chain[split_index-1].block_hash == hashes[i]:
+                                if Server.singleton.blockchain.chain[batches_recieved*100 + i].block_hash == hashes[i]:
                                     split_index = batches_recieved*100 + i + 1
                                     hashes = []
                                     break
