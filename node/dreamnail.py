@@ -317,7 +317,7 @@ class Connection:
             print(f"### Connection with {self.address} completed setup (version: {peer_version})")
             self.completed_setup = True
         except (AssertionError, TimeoutError, ValueError) as err:
-            print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {err}")
+            print(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {type(err)}: {err.args}")
             # Terminate the connection
             self.close()
         finally:
@@ -338,12 +338,12 @@ class Connection:
                 print(f"!!! Connection at {self.address} failed and forced to close due to {err}.")
                 self.close()
 
-    def read_last_message(self):
+    def read_last_message(self, timeout=15.0):
         start = timeit.default_timer()
         while self.last_message is None:
             if self.closed:
                 return
-            if timeit.default_timer() - start >= 15.0:
+            if timeit.default_timer() - start >= timeout:
                 raise TimeoutError("Did not recieve answer from peer")
         output = self.last_message
         self.last_message = None
@@ -419,7 +419,7 @@ class Connection:
     @connection_command
     def CHNSYN(self):
         """Syncs ourselves with the peer's larger chain"""
-        peer_chain_mass = self.read_last_message()
+        peer_chain_mass = self.read_last_message(60.0)
         peer_chain_mass = int(peer_chain_mass)
         assert peer_chain_mass > 0
         self.peer_chain_mass = peer_chain_mass
