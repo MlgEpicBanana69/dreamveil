@@ -393,7 +393,7 @@ class Connection:
     #region connection commands
     @connection_command
     def SENDTX(self, transaction:dreamveil.Transaction):
-        assert self.recv() == "ACK"
+        assert self.read_last_message() == "ACK"
         self.send(transaction.signature)
         ans = self.read_last_message()
         if ans == "True":
@@ -401,7 +401,7 @@ class Connection:
 
     @connection_command
     def SENDBK(self, block:dreamveil.Block):
-        assert self.recv() == "ACK"
+        assert self.read_last_message() == "ACK"
         self.send(block.get_header())
         ans = self.read_last_message()
         if ans == "True":
@@ -420,7 +420,7 @@ class Connection:
             my_chain_mass = Server.singleton.blockchain.mass
             my_chain_len = len(Server.singleton.blockchain.chain)
             self.send(f"{my_chain_mass} {my_chain_len}")
-            assert self.recv() == "ACK"
+            assert self.read_last_message() == "ACK"
             hash_batches_sent = 0
             split_index = "continue"
             while split_index == "continue":
@@ -559,7 +559,7 @@ class Connection:
                             batches_recieved += 1
                         self.send(str(split_index))
 
-                        assert self.recv() == "start"
+                        assert self.read_last_message() == "start"
                         blocks_sent = 0
                         for block in Server.singleton.blockchain.chain[split_index::]:
                             self.send(block.dumps())
