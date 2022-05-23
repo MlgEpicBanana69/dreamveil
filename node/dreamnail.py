@@ -210,10 +210,12 @@ class Server:
             else:
                 mined_block.mine()
 
-    def try_chain_block(self, block, exclusions=[]):
+    def try_chain_block(self, block, exclusions:list=None):
         """Attempts to chain a given block to the current blockchain.
         On success sends the block to all connected peers.
         Will not share with peer addresses given in :exclusions:"""
+        if exclusions is None:
+            exclusions = []
         self.chain_lock.acquire()
         try:
             if self.blockchain.chain_block(block):

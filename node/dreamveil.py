@@ -1,3 +1,4 @@
+import threading
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
@@ -330,7 +331,9 @@ class Blockchain:
 
     # Unspent_transaction_tree
     # Transaction signature: (spent, value)
-    def __init__(self, chain=[], mass=0, unspent_transactions_tree=None):
+    def __init__(self, chain:list=None, mass:int=0, unspent_transactions_tree:data_structures.AVL=None):
+        if chain is None:
+            chain = []
         self.chain = chain
         self.mass = mass
         self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
