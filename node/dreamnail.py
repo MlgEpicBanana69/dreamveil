@@ -269,16 +269,15 @@ class Connection:
             else:
                 self.close(remove_peer=False)
                 return
-
-            self.run_thread = threading.Thread(target=self.run)
-            self.run_thread.start()
         finally:
             Connection.connection_lock.release()
+        self.run_thread = threading.Thread(target=self.run)
+        self.run_thread.start()
         self.setup()
 
     def setup(self):
+        self.lock.acquire()
         try:
-            self.lock.acquire()
             # Check that node versions match
             peer_version = None
             if self.first_to_move:
@@ -344,7 +343,7 @@ class Connection:
         while self.last_message is None:
             if self.closed:
                 return
-            if timeit.default_timer() - start >= 10.0:
+            if timeit.default_timer() - start >= 15.0:
                 raise TimeoutError("Did not recieve answer from peer")
         output = self.last_message
         self.last_message = None
@@ -403,6 +402,7 @@ class Connection:
     #region connection commands
     @connection_command
     def SENDTX(self, transaction:dreamveil.Transaction):
+        assert self.recv() == "ACK"
         self.send(transaction.signature)
         ans = self.read_last_message()
         if ans == "True":
@@ -410,6 +410,7 @@ class Connection:
 
     @connection_command
     def SENDBK(self, block:dreamveil.Block):
+        assert self.recv() == "ACK"
         self.send(block.get_header())
         ans = self.read_last_message()
         if ans == "True":
@@ -418,19 +419,17 @@ class Connection:
     @connection_command
     def CHNSYN(self):
         """Syncs ourselves with the peer's larger chain"""
-        # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
-        my_chain_mass = Server.singleton.blockchain.mass
-        my_chain_len = len(Server.singleton.blockchain.chain)
-        self.send(f"{my_chain_mass} {my_chain_len}")
-
         peer_chain_mass = self.read_last_message()
         peer_chain_mass = int(peer_chain_mass)
         assert peer_chain_mass > 0
         self.peer_chain_mass = peer_chain_mass
 
         if peer_chain_mass > my_chain_mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
-            self.send("True")
-
+            # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
+            my_chain_mass = Server.singleton.blockchain.mass
+            my_chain_len = len(Server.singleton.blockchain.chain)
+            self.send(f"{my_chain_mass} {my_chain_len}")
+            assert self.recv() == "ACK"
             hash_batches_sent = 0
             split_index = "continue"
             while split_index == "continue":
@@ -448,11 +447,12 @@ class Connection:
             # Create the new blockchain object and fill in the known blocks
             if form_new_chain:
                 new_blockchain = dreamveil.Blockchain()
-                for i in range(split_index):
+                for i in range(split_index+1):
                     new_blockchain.chain_block(Server.singleton.blockchain.chain[i])
             else:
                 new_blockchain = Server.singleton.blockchain
 
+            self.send("start")
             # Download all the blocks mentioned in the inventory list from the peer
             try:
                 while new_blockchain.mass != peer_chain_mass:
@@ -497,6 +497,7 @@ class Connection:
             # I GOT ...
             match command:
                 case "SENDTX":
+                    self.send("ACK")
                     tx_signature = self.read_last_message().split(' ')
                     try:
                         assert Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
@@ -514,6 +515,7 @@ class Connection:
                         else:
                             self.close()
                 case "SENDBK":
+                    self.send("ACK")
                     bk_prev_hash, bk_hash = json.loads(self.read_last_message())
                     my_top_hash = Server.singleton.blockchain.chain[-1].block_hash if len(Server.singleton.blockchain.chain) > 0 else ''
                     self.peer_chain_mass += dreamveil.Block.calculate_block_hash_difficulty(bk_hash)
@@ -529,17 +531,20 @@ class Connection:
                         self.send("False")
                 case "CHNSYN":
                     """Syncs peer with our larger blockchain"""
-                    peer_chain_mass, peer_chain_len = self.read_last_message().split(' ')
-                    peer_chain_mass = int(peer_chain_mass)
-                    peer_chain_len = int(peer_chain_len)
-                    assert peer_chain_mass >= 0 and peer_chain_len >= 0
-                    self.peer_chain_mass = peer_chain_mass
-
                     my_chain_mass = Server.singleton.blockchain.mass
                     my_chain_len  = len(Server.singleton.blockchain.chain)
                     self.send(f"{my_chain_mass}")
 
-                    if self.read_last_message() == "True":
+                    resp = self.read_last_message()
+                    if resp != "False":
+                        peer_chain_mass, peer_chain_len = resp.split(' ')
+                        peer_chain_mass = int(peer_chain_mass)
+                        peer_chain_len = int(peer_chain_len)
+                        assert peer_chain_mass >= 0 and peer_chain_len >= 0
+                        self.peer_chain_mass = peer_chain_mass
+
+                        self.send("ACK")
+
                         hashes = []
                         split_index = 0
                         batches_recieved = 0
@@ -548,10 +553,11 @@ class Connection:
                             if hashes == ['']:
                                 hashes = []
                             assert len(hashes) <= 100
-                            for i in range(min(len(hashes), my_chain_len))[::-1]:
+                            hashes = hashes[:max(0, my_chain_len - batches_recieved*100)]
+                            for i in range(len(hashes))[::-1]:
                                 # Have we found the split index?
-                                if Server.singleton.blockchain.chain[i].block_hash == hashes[i]:
-                                    split_index = (peer_chain_len//100 - batches_recieved*100) + i+1
+                                split_index = batches_recieved*100 + i
+                                if Server.singleton.blockchain.chain[split_index-1].block_hash == hashes[i]:
                                     hashes = []
                                     break
                             if len(hashes) == 100:
@@ -562,6 +568,7 @@ class Connection:
                             batches_recieved += 1
                         self.send(str(split_index))
 
+                        assert self.recv() == "start"
                         blocks_sent = 0
                         for block in Server.singleton.blockchain.chain[split_index::]:
                             self.send(block.dumps())
@@ -576,11 +583,12 @@ class Connection:
                     else:
                         print(f"### Peer {self.address} refused chain sync.")
                         print(f"### Succesfuly executed {command} with {self.address}")
+
             print(f"### Succesfuly executed {command} with {self.address}")
             if self.peer_chain_mass > Server.singleton.blockchain.mass + Server.singleton.difficulty_target * Server.TRUST_HEIGHT:
-                    print(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
-                    chnsyn_thread = threading.Thread(target=self.CHNSYN)
-                    chnsyn_thread.start()
+                print(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
+                chnsyn_thread = threading.Thread(target=self.CHNSYN)
+                chnsyn_thread.start()
             return True
         except (AssertionError, ValueError, TimeoutError) as command_err:
             log_str  = f"!!! Failure while executing {command} from {self.address}\n"
