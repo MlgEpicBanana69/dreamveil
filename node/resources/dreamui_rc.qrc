@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="resources">
+    <file>Background.png</file>
+    <file>dreamveil.ico</file>
+    <file>main page.png</file>
+  </qresource>
+</RCC>

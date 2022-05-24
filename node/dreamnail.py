@@ -1,6 +1,5 @@
 import dreamveil
 import dreamshield
-import dreamui
 import dreambench
 
 import configparser
@@ -16,7 +15,7 @@ import atexit
 import time
 
 from Crypto.PublicKey import RSA
-from PyQt6 import QtWidgets
+from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
 import socket
@@ -41,7 +40,7 @@ import threading
 #   Does not try to form a block using transactions
 #   Does not attempt to solve any blocks
 
-APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__)) + "\\"
+APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__))
 
 class Server:
     singleton = None
@@ -209,7 +208,7 @@ class Server:
                     print(f"### MINED BLOCK {mined_block.block_hash}")
                 else:
                     print(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
-                    with open(APPLICATION_PATH + f"POWfailed\\{mined_block.block_hash}.json.old", "w+", encoding="utf-8") as backup_file:
+                    with open(APPLICATION_PATH + f"\\POWfailed\\{mined_block.block_hash}.json.old", "w+", encoding="utf-8") as backup_file:
                         backup_file.write(mined_block.dumps())
                     mined_block.mine()
             else:
@@ -621,8 +620,10 @@ def exit_handler():
 # Main thread loop
 if __name__ == '__main__':
     atexit.register(exit_handler)
+    QtCore.QDir.addSearchPath("resources", APPLICATION_PATH + "/resources/")
+    import dreamui
     application_config = configparser.ConfigParser()
-    application_config.read(APPLICATION_PATH + "node.cfg")
+    application_config.read(APPLICATION_PATH + "\\node.cfg")
     VERSION = application_config["METADATA"]["version"]
 
     print("Loading bench from saved files...")

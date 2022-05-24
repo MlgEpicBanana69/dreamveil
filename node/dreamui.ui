@@ -32,7 +32,7 @@
    <string>Dreamveil</string>
   </property>
   <property name="windowIcon">
-   <iconset>
+   <iconset resource="resources/dreamui_rc.qrc">
     <normaloff>:/resources/dreamveil.ico</normaloff>:/resources/dreamveil.ico</iconset>
   </property>
   <property name="autoFillBackground">
@@ -95,7 +95,7 @@
        <string/>
       </property>
       <property name="pixmap">
-       <pixmap>:/resources/main page.png</pixmap>
+       <pixmap resource="resources/dreamui_rc.qrc">:/resources/main page.png</pixmap>
       </property>
      </widget>
     </widget>
@@ -269,7 +269,7 @@
        <string/>
       </property>
       <property name="pixmap">
-       <pixmap>:/resources/Background.png</pixmap>
+       <pixmap resource="resources/dreamui_rc.qrc">:/resources/Background.png</pixmap>
       </property>
      </widget>
      <zorder>background_2</zorder>
@@ -292,7 +292,7 @@
        <string/>
       </property>
       <property name="pixmap">
-       <pixmap>:/resources/Background.png</pixmap>
+       <pixmap resource="resources/dreamui_rc.qrc">:/resources/Background.png</pixmap>
       </property>
      </widget>
     </widget>
@@ -301,7 +301,7 @@
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources>
-  <include location="dreamui_rsc.qrc"/>
+  <include location="resources/dreamui_rc.qrc"/>
  </resources>
  <connections/>
 </ui>
