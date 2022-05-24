@@ -31,6 +31,10 @@
   <property name="windowTitle">
    <string>Dreamveil</string>
   </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>:/resources/dreamveil.ico</normaloff>:/resources/dreamveil.ico</iconset>
+  </property>
   <property name="autoFillBackground">
    <bool>false</bool>
   </property>
@@ -39,9 +43,6 @@
   </property>
   <property name="animated">
    <bool>false</bool>
-  </property>
-  <property name="dockOptions">
-   <set>QMainWindow::AllowTabbedDocks</set>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
@@ -59,8 +60,8 @@
       <height>661</height>
      </rect>
     </property>
-    <property name="toolTip">
-     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <property name="autoFillBackground">
+     <bool>true</bool>
     </property>
     <property name="currentIndex">
      <number>0</number>
@@ -68,11 +69,20 @@
     <property name="usesScrollButtons">
      <bool>false</bool>
     </property>
-    <widget class="QWidget" name="tab">
+    <property name="tabBarAutoHide">
+     <bool>false</bool>
+    </property>
+    <widget class="QWidget" name="AboutTab">
+     <property name="contextMenuPolicy">
+      <enum>Qt::NoContextMenu</enum>
+     </property>
+     <property name="accessibleName">
+      <string notr="true"/>
+     </property>
      <attribute name="title">
       <string>About</string>
      </attribute>
-     <widget class="QLabel" name="label_3">
+     <widget class="QLabel" name="background">
       <property name="geometry">
        <rect>
         <x>0</x>
@@ -85,21 +95,21 @@
        <string/>
       </property>
       <property name="pixmap">
-       <pixmap resource="resources/resources.qrc">:/resources/main page.png</pixmap>
+       <pixmap>:/resources/main page.png</pixmap>
       </property>
      </widget>
     </widget>
-    <widget class="QWidget" name="MainTab">
+    <widget class="QWidget" name="UserTab">
      <attribute name="title">
       <string>User</string>
      </attribute>
      <widget class="QWidget" name="verticalLayoutWidget">
       <property name="geometry">
        <rect>
-        <x>170</x>
-        <y>90</y>
+        <x>160</x>
+        <y>80</y>
         <width>621</width>
-        <height>411</height>
+        <height>451</height>
        </rect>
       </property>
       <property name="sizePolicy">
@@ -130,7 +140,7 @@
           </font>
          </property>
          <property name="text">
-          <string>Username:</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;Username:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="indent">
           <number>100</number>
@@ -174,7 +184,7 @@
           </font>
          </property>
          <property name="text">
-          <string>Password:</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;Password:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="indent">
           <number>100</number>
@@ -246,33 +256,52 @@
        </item>
       </layout>
      </widget>
+     <widget class="QLabel" name="background_2">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>965</width>
+        <height>635</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="pixmap">
+       <pixmap>:/resources/Background.png</pixmap>
+      </property>
+     </widget>
+     <zorder>background_2</zorder>
+     <zorder>verticalLayoutWidget</zorder>
     </widget>
     <widget class="QWidget" name="tab_2">
      <attribute name="title">
       <string>Tab 2</string>
      </attribute>
+     <widget class="QLabel" name="background_3">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>965</width>
+        <height>635</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="pixmap">
+       <pixmap>:/resources/Background.png</pixmap>
+      </property>
+     </widget>
     </widget>
    </widget>
-   <widget class="QLabel" name="label_4">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>0</y>
-      <width>971</width>
-      <height>671</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-   </widget>
-   <zorder>label_4</zorder>
-   <zorder>tabWidget</zorder>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources>
-  <include location="resources/resources.qrc"/>
+  <include location="dreamui_rsc.qrc"/>
  </resources>
  <connections/>
 </ui>
