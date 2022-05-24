@@ -1,9 +1,12 @@
 import dreamveil
 import dreamshield
+import dreamui
+import dreambench
 
 import configparser
 import ipaddress
 import os
+import sys
 import secrets
 import json
 import random
@@ -11,8 +14,10 @@ import math
 import timeit
 import atexit
 import time
-import getpass
+
 from Crypto.PublicKey import RSA
+from PyQt6 import QtWidgets
+from PyQt6.QtWidgets import QApplication, QMainWindow
 
 import socket
 import threading
@@ -25,9 +30,9 @@ import threading
 # Fix threading and rework CHNSYN (DONE)
 
 # implement whitedoable env loading that's organized (WIP)
+# Implement the gui (WIP)
 # implement online communication-wide encryption (integrity and confidentiallity) (NIP)
 # implement a changing PoW difficulty (NIP)
-# Implement the gui (NIP)
 
 # Behavior of miner:
 #   Will use the most rewarding transactions to form a block.
@@ -50,7 +55,7 @@ class Server:
             raise Exception("Singleton class limited to one instance")
         Server.singleton = self
 
-        self.difficulty_target = int(2**8) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+        self.difficulty_target = int(2**16) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
         self.host_keys = host_keys
         self.version = version
         self.address = address
@@ -611,79 +616,23 @@ class Connection:
             del self
 
 def exit_handler():
-    user_file.close()
-
-def load_bench():
-    if not os.path.isdir(APPLICATION_PATH + "bench"):
-        os.mkdir(APPLICATION_PATH + "bench")
-    if not os.path.isdir(APPLICATION_PATH + "bench\\backup"):
-        os.mkdir(APPLICATION_PATH + "bench\\backup")
-
-    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "bench\\blockchain.json") else "w+"
-    with open(APPLICATION_PATH + "bench\\blockchain.json", read_param) as f:
-        try:
-            contents = f.read()
-            if contents == "":
-                contents = "[]"
-                f.write(contents)
-            blockchain = dreamveil.Blockchain.loads(contents)
-        except (ValueError, AssertionError) as err:
-            print("!!! Could not loads blockchain from bench")
-            print(err)
-
-            f.close()
-            if os.path.isfile(APPLICATION_PATH + "bench\\blockchain.json"):
-                os.rename(APPLICATION_PATH + "bench\\blockchain.json", APPLICATION_PATH + f"bench\\backup\\blockchain-{secrets.token_hex(8)}.json.old")
-
-    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "bench\\peer_pool.json") else "w+"
-    with open(APPLICATION_PATH + "bench\\peer_pool.json", read_param) as f:
-        try:
-            contents = f.read()
-            if contents == "":
-                contents = "{}"
-                f.write(contents)
-            peer_pool = json.loads(contents)
-            assert type(peer_pool) == dict
-        except (ValueError, AssertionError) as err:
-            print("!!! Could not loads peer pool from bench")
-            print(err)
-            f.close()
-            if os.path.isfile("bench\\peer_pool.json"):
-                os.rename("bench\\peer_pool.json", f"bench\\backup\\peer_pool-{secrets.token_hex(8)}.json.old")
-
-    return blockchain, peer_pool
-
-application_config = configparser.ConfigParser()
-application_config.read(APPLICATION_PATH + "node.cfg")
-VERSION = application_config["METADATA"]["version"]
-
-print("Loading bench from saved files...")
-blockchain, peer_pool = load_bench()
-print("Finished loading bench")
-
-username = ""
-while username == "" or not os.path.isfile(APPLICATION_PATH + f"users\\{username}"):
-    username = input("Username: ")
-
-while True:
-    password = getpass.getpass(prompt="Password: ")
-    with open(APPLICATION_PATH + f"users\\{username}", "rb") as user_file:
-        atexit.register(exit_handler)
-        try:
-            # Encrypts
-            #user_file_contents = RSA.generate(2048)
-            #user_file_contents = user_file_contents.export_key('PEM')
-            #user_file_contents = json.dumps([user_file_contents.decode()])
-            #user_file_contents = dreamshield.encrypt(password, user_file_contents)
-            #user_file.write(user_file_contents)
-            user_file_contents = user_file.read()
-            host_keys = [RSA.import_key(key) for key in json.loads(dreamshield.decrypt(password, user_file_contents).decode())]
-            break
-        except (ValueError, json.JSONDecodeError):
-            print("Invalid password!")
-
-server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
+    print("Exit")
 
 # Main thread loop
-while True:
-    pass
+if __name__ == '__main__':
+    atexit.register(exit_handler)
+    application_config = configparser.ConfigParser()
+    application_config.read(APPLICATION_PATH + "node.cfg")
+    VERSION = application_config["METADATA"]["version"]
+
+    print("Loading bench from saved files...")
+    blockchain, peer_pool = dreambench.load_bench()
+    print("Finished loading bench")
+
+    app = QApplication(sys.argv)
+    win = QMainWindow()
+    ui = dreamui.Ui_MainWindow()
+    ui.setupUi(win)
+    win.show()
+    #server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
+    sys.exit(app.exec())

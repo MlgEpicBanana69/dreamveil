@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'd:\Projects\dreamveil\node\pyqttest\dreamveil.ui'
+# Form implementation generated from reading ui file 'd:\Projects\dreamveil\node\dreamui.ui'
 #
 # Created by: PyQt6 UI code generator 6.2.3
 #
@@ -22,7 +22,6 @@ class Ui_MainWindow(object):
         MainWindow.setMaximumSize(QtCore.QSize(968, 671))
         MainWindow.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonIconOnly)
         MainWindow.setAnimated(False)
-        MainWindow.setDockOptions(QtWidgets.QMainWindow.AllowTabbedDocks)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)

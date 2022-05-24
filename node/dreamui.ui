@@ -31,6 +31,9 @@
   <property name="windowTitle">
    <string>Dreamveil</string>
   </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
   <property name="toolButtonStyle">
    <enum>Qt::ToolButtonIconOnly</enum>
   </property>
@@ -62,6 +65,30 @@
     <property name="currentIndex">
      <number>0</number>
     </property>
+    <property name="usesScrollButtons">
+     <bool>false</bool>
+    </property>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string>About</string>
+     </attribute>
+     <widget class="QLabel" name="label_3">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>971</width>
+        <height>631</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="pixmap">
+       <pixmap resource="resources/resources.qrc">:/resources/main page.png</pixmap>
+      </property>
+     </widget>
+    </widget>
     <widget class="QWidget" name="MainTab">
      <attribute name="title">
       <string>User</string>
@@ -69,9 +96,9 @@
      <widget class="QWidget" name="verticalLayoutWidget">
       <property name="geometry">
        <rect>
-        <x>160</x>
-        <y>100</y>
-        <width>641</width>
+        <x>170</x>
+        <y>90</y>
+        <width>621</width>
         <height>411</height>
        </rect>
       </property>
@@ -113,15 +140,15 @@
        <item alignment="Qt::AlignHCenter">
         <widget class="QLineEdit" name="lineEdit">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
          <property name="font">
           <font>
-           <family>Trajan Pro</family>
-           <pointsize>28</pointsize>
+           <family>Perpetua</family>
+           <pointsize>36</pointsize>
           </font>
          </property>
          <property name="text">
@@ -157,15 +184,15 @@
        <item alignment="Qt::AlignHCenter">
         <widget class="QLineEdit" name="lineEdit_2">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
          <property name="font">
           <font>
-           <family>Trajan Pro</family>
-           <pointsize>28</pointsize>
+           <family>Perpetua</family>
+           <pointsize>36</pointsize>
           </font>
          </property>
          <property name="text">
@@ -226,9 +253,26 @@
      </attribute>
     </widget>
    </widget>
+   <widget class="QLabel" name="label_4">
+    <property name="geometry">
+     <rect>
+      <x>0</x>
+      <y>0</y>
+      <width>971</width>
+      <height>671</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <zorder>label_4</zorder>
+   <zorder>tabWidget</zorder>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
- <resources/>
+ <resources>
+  <include location="resources/resources.qrc"/>
+ </resources>
  <connections/>
 </ui>
