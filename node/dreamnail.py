@@ -1,6 +1,8 @@
 import dreamveil
 import dreamshield
 import dreambench
+import dreamui
+
 
 import configparser
 import ipaddress
@@ -621,7 +623,6 @@ def exit_handler():
 if __name__ == '__main__':
     atexit.register(exit_handler)
     QtCore.QDir.addSearchPath("resources", APPLICATION_PATH + "/resources/")
-    import dreamui
     application_config = configparser.ConfigParser()
     application_config.read(APPLICATION_PATH + "\\node.cfg")
     VERSION = application_config["METADATA"]["version"]
