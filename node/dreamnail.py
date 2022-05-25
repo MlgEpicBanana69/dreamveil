@@ -124,11 +124,11 @@ class Server:
                     connection_result = self.connect(new_peer)
                     if connection_result is None:
                         # TODO: Define peer status system
-                        if peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
-                            peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
+                        if self.peer_pool[new_peer] != Server.PEER_STATUS_OFFLINE:
+                            self.peer_pool[new_peer] = Server.PEER_STATUS_OFFLINE
                             print(f"### Marked {new_peer} as OFFLINE")
                     else:
-                        peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
+                        self.peer_pool[new_peer] = Server.PEER_STATUS_CONVERSED
 
     def accepter(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -616,25 +616,55 @@ class Connection:
             self.socket.close()
             del self
 
-def exit_handler():
-    print("Exit")
+class dreamnail:
+    singleton = None
 
-# Main thread loop
+    def __init__(self):
+        if dreamnail.singleton is not None:
+            raise Exception("Singleton object limited to one instance.")
+        dreamnail.singleton = self
+
+        self.logged_user = None
+        atexit.register(self.exit_handler)
+        QtCore.QDir.addSearchPath("resources", APPLICATION_PATH + "/resources/")
+        application_config = configparser.ConfigParser()
+        application_config.read(APPLICATION_PATH + "\\node.cfg")
+        VERSION = application_config["METADATA"]["version"]
+
+        print("Loading bench from saved files...")
+        self.blockchain, self.peer_pool = dreambench.load_bench()
+        print("Finished loading bench")
+
+        self.app = QApplication(sys.argv)
+        self.win = QMainWindow()
+        self.ui = dreamui.Ui_MainWindow()
+        self.ui.setupUi(self.win)
+        self.ui.loginButton.clicked.connect(self.login_clicked)
+        self.win.show()
+        #server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
+        sys.exit(self.app.exec())
+
+    # static method
+    def exit_handler():
+        print("Exit")
+
+    #region ui events
+    def login_clicked(self):
+        username = self.ui.usernameLineEdit.text()
+        passphrase = self.ui.passwordLineEdit.text()
+
+        if os.path.isfile(APPLICATION_PATH + f"\\users\\{username}"):
+            user_keys = dreambench.try_read_user_file(passphrase, username)
+            if user_keys is not None:
+                self.user_keys = user_keys
+                self.logged_user = username
+                self.ui.passwordLineEdit.setText("")
+                self.ui.usernameLineEdit.setText("")
+                print(user_keys)
+            else:
+                QtWidgets.QMessageBox.critical(self.win, "Failed to login", "Invalid password.")
+        else:
+            QtWidgets.QMessageBox.critical(self.win, "Failed to login", "User does not exist!")
+
 if __name__ == '__main__':
-    atexit.register(exit_handler)
-    QtCore.QDir.addSearchPath("resources", APPLICATION_PATH + "/resources/")
-    application_config = configparser.ConfigParser()
-    application_config.read(APPLICATION_PATH + "\\node.cfg")
-    VERSION = application_config["METADATA"]["version"]
-
-    print("Loading bench from saved files...")
-    blockchain, peer_pool = dreambench.load_bench()
-    print("Finished loading bench")
-
-    app = QApplication(sys.argv)
-    win = QMainWindow()
-    ui = dreamui.Ui_MainWindow()
-    ui.setupUi(win)
-    win.show()
-    #server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
-    sys.exit(app.exec())
+    dreamnail()

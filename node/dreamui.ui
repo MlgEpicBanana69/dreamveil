@@ -82,7 +82,7 @@
      <attribute name="title">
       <string>About</string>
      </attribute>
-     <widget class="QLabel" name="background">
+     <widget class="QLabel" name="aboutBackground">
       <property name="geometry">
        <rect>
         <x>0</x>
@@ -126,7 +126,7 @@
         <enum>QLayout::SetMinAndMaxSize</enum>
        </property>
        <item>
-        <widget class="QLabel" name="label">
+        <widget class="QLabel" name="usernameLabel">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -148,7 +148,7 @@
         </widget>
        </item>
        <item alignment="Qt::AlignHCenter">
-        <widget class="QLineEdit" name="lineEdit">
+        <widget class="QLineEdit" name="usernameLineEdit">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -170,7 +170,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="label_2">
+        <widget class="QLabel" name="passwordLabel">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -192,7 +192,7 @@
         </widget>
        </item>
        <item alignment="Qt::AlignHCenter">
-        <widget class="QLineEdit" name="lineEdit_2">
+        <widget class="QLineEdit" name="passwordLineEdit">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -217,7 +217,7 @@
         </widget>
        </item>
        <item>
-        <spacer name="verticalSpacer">
+        <spacer name="userVerticalSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
          </property>
@@ -233,7 +233,7 @@
         </spacer>
        </item>
        <item alignment="Qt::AlignHCenter">
-        <widget class="QPushButton" name="pushButton">
+        <widget class="QPushButton" name="loginButton">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -256,7 +256,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QLabel" name="background_2">
+     <widget class="QLabel" name="userBackground">
       <property name="geometry">
        <rect>
         <x>0</x>
@@ -272,7 +272,7 @@
        <pixmap resource="resources/dreamui_rc.qrc">:/resources/Background.png</pixmap>
       </property>
      </widget>
-     <zorder>background_2</zorder>
+     <zorder>userBackground</zorder>
      <zorder>verticalLayoutWidget</zorder>
     </widget>
     <widget class="QWidget" name="tab_2">
