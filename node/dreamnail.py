@@ -639,7 +639,10 @@ class dreamnail:
         self.win = QMainWindow()
         self.ui = dreamui.Ui_MainWindow()
         self.ui.setupUi(self.win)
-        self.ui.loginButton.clicked.connect(self.login_clicked)
+
+        self.ui.loginButton.clicked.connect(self.loginButton_clicked)
+        self.ui.registerButton.clicked.connect(self.registerButton_clicked)
+
         self.win.show()
         #server = Server(VERSION, host_keys[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
         sys.exit(self.app.exec())
@@ -649,7 +652,7 @@ class dreamnail:
         print("Exit")
 
     #region ui events
-    def login_clicked(self):
+    def loginButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
         passphrase = self.ui.passwordLineEdit.text()
 
@@ -665,6 +668,16 @@ class dreamnail:
                 QtWidgets.QMessageBox.critical(self.win, "Failed to login", "Invalid password.")
         else:
             QtWidgets.QMessageBox.critical(self.win, "Failed to login", "User does not exist!")
+
+    def registerButton_clicked(self):
+        username = self.ui.usernameLineEdit.text()
+        passphrase = self.ui.passwordLineEdit.text()
+
+        if dreambench.try_create_user(passphrase, username):
+            self.loginButton_clicked()
+        else:
+            QtWidgets.QMessageBox.critical(self.win, "Failed to register new user", "User already exists!")
+    #endregion
 
 if __name__ == '__main__':
     dreamnail()
