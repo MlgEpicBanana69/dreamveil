@@ -1,5 +1,6 @@
 import dreamveil
 import dreamshield
+from dreamnail import dreamnail
 
 import os
 import secrets
@@ -50,18 +51,21 @@ def load_bench():
     return blockchain, peer_pool
 
 def try_read_user_file(passphrase:str, username:str):
-    with open(APPLICATION_PATH + f"\\users\\{username}", "rb") as user_file:
+    with open(APPLICATION_PATH + f"\\bench\\users\\{username}", "rb") as user_file:
         try:
             user_file_contents = user_file.read()
-            host_keys = [RSA.import_key(key) for key in json.loads(dreamshield.decrypt(passphrase, user_file_contents).decode())]
-            return host_keys
+            user_file_contents = dreamshield.decrypt(passphrase, user_file_contents)
+            user_data = json.loads(user_file_contents)
+            user_data["key"] = RSA.import_key(user_data["key"])
+            return user_data
         except (ValueError, json.JSONDecodeError):
             return None
 
-def write_user_file(passphrase:str, username:str, user_keys:list):
-    with open(APPLICATION_PATH + f"\\users\\{username}", "wb") as user_file:
+def write_user_file(passphrase:str, user_data:dict):
+    with open(APPLICATION_PATH + f"\\bench\\users\\{user_data['username']}", "wb") as user_file:
         try:
-            user_file_contents = json.dumps(user_keys)
+            user_data["key"] = user_data["key"].export_key('PEM').decode()
+            user_file_contents = json.dumps(user_data)
             user_file_contents = dreamshield.encrypt(passphrase, user_file_contents)
             user_file.write(user_file_contents)
             return True
@@ -73,17 +77,14 @@ def try_create_user(passphrase:str, username:str):
     Attempts to create a user given a username and a passphrase.
     :returns: boolean succesfully created user.
     """
-    user_file_path = APPLICATION_PATH + f"\\users\\{username}"
+    user_file_path = APPLICATION_PATH + f"\\bench\\users\\{username}"
     if not os.path.isfile(user_file_path):
         with open(user_file_path, "w"):
             pass
-        write_user_file(passphrase, username, [])
+        new_user_data = dreamnail.USER_DATA_TEMPLATE
+        new_user_data["username"] = username
+        new_user_data["key"] = RSA.generate(2048)
+        write_user_file(passphrase, new_user_data)
         return True
     else:
         return False
-    # Encrypts
-    #user_file_contents = RSA.generate(2048)
-    #user_file_contents = user_file_contents.export_key('PEM')
-    #user_file_contents = json.dumps([user_file_contents.decode()])
-    #user_file_contents = dreamshield.encrypt(password, user_file_contents)
-    #user_file.write(user_file_contents)
