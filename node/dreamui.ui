@@ -325,8 +325,8 @@
      <widget class="QLabel" name="userBackground">
       <property name="geometry">
        <rect>
-        <x>10</x>
-        <y>-10</y>
+        <x>0</x>
+        <y>0</y>
         <width>965</width>
         <height>635</height>
        </rect>
