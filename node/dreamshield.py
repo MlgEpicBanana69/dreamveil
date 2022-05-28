@@ -45,4 +45,4 @@ def decrypt(passphrase:str, ct:bytes):
         raise ValueError("Incorrect passphrase or invalid message")
 
     pt = AES.new(key=expansion[:16:], mode=AES.MODE_CTR, nonce=nonce).decrypt(encrypted_pt)
-    return pt
+    return pt.decode()
