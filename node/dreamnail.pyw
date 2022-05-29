@@ -712,16 +712,20 @@ class dreamnail:
         self.ui.balanceLabel = self.user_data["balance"]
 
     def usernameLineEdit_textChanged(self):
-        if len(self.ui.usernameLineEdit.text()) > 0 and len(self.ui.passwordLineEdit.text()) > 0:
+        if self.ui.usernameLineEdit.text().isalnum() and len(self.ui.passwordLineEdit.text()) > 0:
             self.ui.loginButton.setEnabled(True)
+            self.ui.registerButton.setEnabled(True)
         else:
             self.ui.loginButton.setEnabled(False)
+            self.ui.registerButton.setEnabled(False)
 
     def passwordLineEdit_textChanged(self):
-        if len(self.ui.usernameLineEdit.text()) > 0 and len(self.ui.passwordLineEdit.text()) > 0:
+        if self.ui.usernameLineEdit.text().isalnum() and len(self.ui.passwordLineEdit.text()) > 0:
             self.ui.loginButton.setEnabled(True)
+            self.ui.registerButton.setEnabled(True)
         else:
             self.ui.loginButton.setEnabled(False)
+            self.ui.registerButton.setEnabled(False)
 
     def serverStateButton_clicked(self):
         if self.server is None:
