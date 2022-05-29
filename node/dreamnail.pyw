@@ -300,7 +300,7 @@ class dreamnail:
                 peer_version = None
                 if self.first_to_move:
                     self.send(dreamnail.Server.singleton.version)
-                    peer_version = self.read_last_message(60.0)
+                    peer_version = self.read_last_message()
                 else:
                     peer_version = self.read_last_message()
                     self.send(dreamnail.Server.singleton.version)
