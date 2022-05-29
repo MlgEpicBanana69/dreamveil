@@ -332,6 +332,11 @@ class dreamnail:
                     if peer not in dreamnail.Server.singleton.peer_pool and peer != dreamnail.Server.singleton.address:
                         dreamnail.Server.singleton.peer_pool[peer] = dreamnail.Server.PEER_STATUS_UNKNOWN
 
+                if self.peer_chain_mass > dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
+                    dreamnail.singleton.log(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {dreamnail.Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
+                    chnsyn_thread = threading.Thread(target=self.CHNSYN)
+                    chnsyn_thread.start()
+
                 dreamnail.singleton.log(f"### Connection with {self.address} completed setup (version: {peer_version})")
                 self.completed_setup = True
             except (AssertionError, TimeoutError, ValueError) as err:
@@ -340,10 +345,6 @@ class dreamnail:
                 self.close()
             finally:
                 self.lock.release()
-                if self.peer_chain_mass > dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
-                    dreamnail.singleton.log(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {dreamnail.Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
-                    chnsyn_thread = threading.Thread(target=self.CHNSYN)
-                    chnsyn_thread.start()
 
         def run(self):
             while not self.closed:
@@ -382,6 +383,7 @@ class dreamnail:
             except Exception as err:
                 dreamnail.singleton.log(f"Failed to send message to {self.address} due to error: {type(err)}: {err.args}")
                 self.close()
+                raise
                 return
 
         def recv(self):
@@ -651,6 +653,8 @@ class dreamnail:
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
         self.ui.serverStateButton.clicked.connect(self.serverStateButton_clicked)
         self.ui.registerButton.clicked.connect(self.registerButton_clicked)
+        self.ui.usernameLineEdit.textChanged.connect(self.usernameLineEdit_textChanged)
+        self.ui.passwordLineEdit.textChanged.connect(self.passwordLineEdit_textChanged)
 
         self.application_config = configparser.ConfigParser()
         self.application_config.read(APPLICATION_PATH + "\\node.cfg")
@@ -707,6 +711,18 @@ class dreamnail:
         self.ui.userLabel = self.user_data["username"]
         self.ui.balanceLabel = self.user_data["balance"]
 
+    def usernameLineEdit_textChanged(self):
+        if len(self.ui.usernameLineEdit.text()) > 0 and len(self.ui.passwordLineEdit.text()) > 0:
+            self.ui.loginButton.setEnabled(True)
+        else:
+            self.ui.loginButton.setEnabled(False)
+
+    def passwordLineEdit_textChanged(self):
+        if len(self.ui.usernameLineEdit.text()) > 0 and len(self.ui.passwordLineEdit.text()) > 0:
+            self.ui.loginButton.setEnabled(True)
+        else:
+            self.ui.loginButton.setEnabled(False)
+
     def serverStateButton_clicked(self):
         if self.server is None:
             try:
@@ -739,11 +755,12 @@ class dreamnail:
 
     def open_server(self):
         # self.server = Server(VERSION, user_key[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
+        server_version = self.application_config["METADATA"]["version"]
         server_address = self.application_config["SERVER"]["address"]
         server_is_miner = True # TODO: implement
         server_port = int(self.application_config["SERVER"]["port"])
 
-        self.server = dreamnail.Server(self, self.user_data["key"], self.blockchain,
+        self.server = dreamnail.Server(server_version, self.user_data["key"], self.blockchain,
                             self.peer_pool, self.transaction_pool, server_address,
                             server_is_miner, self.miner_msg, server_port)
 
