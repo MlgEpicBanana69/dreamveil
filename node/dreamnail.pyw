@@ -117,10 +117,12 @@ class dreamnail:
             dreamnail.singleton.log("Server is now running...")
             if self.is_miner:
                 self.miner_thread.start()
-            while True:
+            while not self.closed:
                 dreamnail.singleton.log(f"### {len(self.peers)}/{self.max_peer_amount} connected. Current peer pool size: {len(self.peer_pool)} Current blockchain length and mass {len(self.blockchain.chain)} {self.blockchain.mass}")
-                time.sleep(60)
-
+                start = timeit.default_timer()
+                while timeit.default_timer() - start < 60.0 and not self.closed:
+                    pass
+            print("### Server stopped running.")
         def seeker(self):
             time.sleep(5)
             dreamnail.singleton.log(f"Server is now seeking new connections")
@@ -138,6 +140,7 @@ class dreamnail:
                                 dreamnail.singleton.log(f"### Marked {new_peer} as OFFLINE")
                         else:
                             self.peer_pool[new_peer] = dreamnail.Server.PEER_STATUS_CONVERSED
+            dreamnail.singleton.log("### Server connection seeker is shutdown.")
 
         def accepter(self):
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -147,10 +150,14 @@ class dreamnail:
 
             while not self.closed:
                 # Do not accept new connections once peer count exceeds maximum allowed
-                while len(self.peers) < self.max_peer_amount and not self.closed:
-                    peer_socket, peer_address = self.socket.accept()
-                    dreamnail.Connection(peer_socket, peer_address[0])
-                    dreamnail.singleton.log(f"### {peer_address[0]} connected to node")
+                try:
+                    while len(self.peers) < self.max_peer_amount and not self.closed:
+                        peer_socket, peer_address = self.socket.accept()
+                        dreamnail.Connection(peer_socket, peer_address[0])
+                        dreamnail.singleton.log(f"### {peer_address[0]} connected to node")
+                except OSError:
+                    pass
+            dreamnail.singleton.log("### Server connection accepter is shutdown.")
 
         def connect(self, address):
             if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
@@ -174,6 +181,7 @@ class dreamnail:
         def close(self):
             """Terminated the server and all of its ongoing connections"""
             dreamnail.singleton.log("### SHUTTING DOWN SERVER")
+            self.socket.close()
             for peer in self.peers:
                 peer.close()
 
