@@ -3,7 +3,6 @@ import dreamshield
 import dreambench
 import dreamui
 
-
 import configparser
 import ipaddress
 import os
@@ -14,6 +13,7 @@ import random
 import math
 import timeit
 import atexit
+import socket
 import time
 
 from Crypto.PublicKey import RSA
@@ -46,12 +46,6 @@ APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__))
 
 class dreamnail:
     singleton = None
-
-    USER_DATA_TEMPLATE = {"username": None,
-                          "key": None,
-                          "balance": 0,
-                          "outgoing": [],
-                          "ingoing": []}
 
     class Server:
         singleton = None
@@ -123,41 +117,49 @@ class dreamnail:
                 while timeit.default_timer() - start < 60.0 and not self.closed:
                     pass
             print("### Server stopped running.")
+
         def seeker(self):
             time.sleep(5)
             dreamnail.singleton.log(f"Server is now seeking new connections")
-
-            while not self.closed:
-                # Once connection amount is too low, seek connections if possible.
-                while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
-                    new_peer = self.roll_peer()
-                    if new_peer is not None:
-                        connection_result = self.connect(new_peer)
-                        if connection_result is None:
-                            # TODO: Define peer status system
-                            if self.peer_pool[new_peer] != dreamnail.Server.PEER_STATUS_OFFLINE:
-                                self.peer_pool[new_peer] = dreamnail.Server.PEER_STATUS_OFFLINE
-                                dreamnail.singleton.log(f"### Marked {new_peer} as OFFLINE")
-                        else:
-                            self.peer_pool[new_peer] = dreamnail.Server.PEER_STATUS_CONVERSED
-            dreamnail.singleton.log("### Server connection seeker is shutdown.")
+            try:
+                while not self.closed:
+                    # Once connection amount is too low, seek connections if possible.
+                    while len(self.peers) < math.floor(self.max_peer_amount*(2/3)) and not self.closed:
+                        new_peer = self.roll_peer()
+                        if new_peer is not None:
+                            connection_result = self.connect(new_peer)
+                            if connection_result is None:
+                                # TODO: Define peer status system
+                                if self.peer_pool[new_peer] != dreamnail.Server.PEER_STATUS_OFFLINE:
+                                    self.peer_pool[new_peer] = dreamnail.Server.PEER_STATUS_OFFLINE
+                                    dreamnail.singleton.log(f"### Marked {new_peer} as OFFLINE")
+                            else:
+                                self.peer_pool[new_peer] = dreamnail.Server.PEER_STATUS_CONVERSED
+            finally:
+                dreamnail.singleton.log("### Server connection seeker is shutdown.")
 
         def accepter(self):
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.bind((self.address, self.port))
-            self.socket.listen(self.max_peer_amount)
-            dreamnail.singleton.log(f"Server is now accepting incoming connections and is binded to {(self.address, self.port)}")
-
-            while not self.closed:
-                # Do not accept new connections once peer count exceeds maximum allowed
+            try:
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
-                    while len(self.peers) < self.max_peer_amount and not self.closed:
-                        peer_socket, peer_address = self.socket.accept()
-                        dreamnail.Connection(peer_socket, peer_address[0])
-                        dreamnail.singleton.log(f"### {peer_address[0]} connected to node")
-                except OSError:
-                    pass
-            dreamnail.singleton.log("### Server connection accepter is shutdown.")
+                    self.socket.bind((self.address, self.port))
+                except OSError as err:
+                    dreamnail.singleton.close_server()
+                    return
+                self.socket.listen(self.max_peer_amount)
+                dreamnail.singleton.log(f"Server is now accepting incoming connections and is binded to {(self.address, self.port)}")
+
+                while not self.closed:
+                    # Do not accept new connections once peer count exceeds maximum allowed
+                    try:
+                        while len(self.peers) < self.max_peer_amount and not self.closed:
+                            peer_socket, peer_address = self.socket.accept()
+                            dreamnail.Connection(peer_socket, peer_address[0])
+                            dreamnail.singleton.log(f"### {peer_address[0]} connected to node")
+                    except OSError:
+                        pass
+            finally:
+                dreamnail.singleton.log("### Server connection accepter is shutdown.")
 
         def connect(self, address):
             if len(self.peers) <= self.max_peer_amount and address not in self.peers.keys():
@@ -654,7 +656,7 @@ class dreamnail:
         self.application_config.read(APPLICATION_PATH + "\\node.cfg")
         self.VERSION = self.application_config["METADATA"]["version"]
 
-        self.user_data = dreamnail.USER_DATA_TEMPLATE
+        self.user_data = dreambench.USER_DATA_TEMPLATE
         self.balance = 0
 
         self.miner_msg = ""
@@ -701,16 +703,24 @@ class dreamnail:
         self.ui.ServerTab.setEnabled(False)
         self.ui.tabWidget.setCurrentIndex(1)
 
-        self.user_data = dreamnail.USER_DATA_TEMPLATE
+        self.user_data = dreambench.USER_DATA_TEMPLATE
         self.ui.userLabel = self.user_data["username"]
         self.ui.balanceLabel = self.user_data["balance"]
 
     def serverStateButton_clicked(self):
         if self.server is None:
-            self.open_server()
-            self.ui.MinerTab.setEnabled(True)
-            self.ui.TransactionEditorTab.setEnabled(True)
-            self.ui.serverStateButton.setIcon(QtGui.QIcon("resources:onLogo.png"))
+            try:
+                test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_sock.bind((self.application_config["SERVER"]["address"],
+                             int(self.application_config["SERVER"]["port"])))
+                test_sock.close()
+                del test_sock
+                self.open_server()
+                self.ui.MinerTab.setEnabled(True)
+                self.ui.TransactionEditorTab.setEnabled(True)
+                self.ui.serverStateButton.setIcon(QtGui.QIcon("resources:onLogo.png"))
+            except OSError as err:
+                QtWidgets.QMessageBox.critical(self.win, "Failed to start server", f"{type(err)}: {err.args[1]}")
         else:
             self.close_server()
             self.ui.MinerTab.setEnabled(False)

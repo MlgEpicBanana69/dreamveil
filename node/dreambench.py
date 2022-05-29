@@ -1,6 +1,5 @@
 import dreamveil
 import dreamshield
-from dreamnail import dreamnail
 
 import os
 import secrets
@@ -10,11 +9,17 @@ from Crypto.PublicKey import RSA
 
 APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__))
 
+USER_DATA_TEMPLATE = {"username": None,
+                          "key": None,
+                          "balance": 0,
+                          "outgoing": [],
+                          "ingoing": []}
+
 def load_bench():
-    if not os.path.isdir(APPLICATION_PATH + "\\bench"):
-        os.mkdir(APPLICATION_PATH + "\\bench")
-    if not os.path.isdir(APPLICATION_PATH + "\\bench\\backup"):
-        os.mkdir(APPLICATION_PATH + "\\bench\\backup")
+    bench_dirs = ["..\\bench", "backup", "users"]
+    for bench_dir in bench_dirs:
+        if not os.path.isdir(f"{APPLICATION_PATH}\\bench\\{bench_dir}"):
+            os.mkdir(f"{APPLICATION_PATH}\\bench\\{bench_dir}")
 
     read_param = "r+" if os.path.isfile(APPLICATION_PATH + "\\bench\\blockchain.json") else "w+"
     with open(APPLICATION_PATH + "\\bench\\blockchain.json", read_param) as f:
@@ -81,7 +86,7 @@ def try_create_user(passphrase:str, username:str):
     if not os.path.isfile(user_file_path):
         with open(user_file_path, "w"):
             pass
-        new_user_data = dreamnail.USER_DATA_TEMPLATE
+        new_user_data = USER_DATA_TEMPLATE
         new_user_data["username"] = username
         new_user_data["key"] = RSA.generate(2048)
         write_user_file(passphrase, new_user_data)
