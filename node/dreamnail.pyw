@@ -298,6 +298,7 @@ class dreamnail:
 
                 if address not in dreamnail.Server.singleton.peers:
                     dreamnail.Server.singleton.peers[self.address] = self
+                    dreamnail.singleton.add_peer(address)
                 else:
                     self.close(remove_peer=False)
                     return
@@ -647,6 +648,7 @@ class dreamnail:
                 self.send("TERMINATE")
                 if self.address in dreamnail.Server.singleton.peers and remove_peer:
                     del dreamnail.Server.singleton.peers[self.address]
+                    dreamnail.singleton.remove_peer(self.address)
             finally:
                 self.socket.close()
                 del self
@@ -663,6 +665,7 @@ class dreamnail:
         self.ui = dreamui.Ui_MainWindow()
         self.ui.setupUi(self.win)
 
+        self.win.closeEvent = lambda event: dreamnail.singleton.exit_handler()
         self.ui.loginButton.clicked.connect(self.loginButton_clicked)
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
         self.ui.serverStateButton.clicked.connect(self.serverStateButton_clicked)
@@ -671,9 +674,17 @@ class dreamnail:
         self.ui.passwordLineEdit.textChanged.connect(self.passwordLineEdit_textChanged)
         self.ui.minerMsgTextEdit.textChanged.connect(self.minerMsgTextEdit_textChanged)
         self.ui.minerStateButton.clicked.connect(self.minerStateButton_clicked)
+        self.ui.peerPoolComboBox.currentIndexChanged.connect(self.peerPoolComboBox_currentIndexChanged)
 
         self.ui.userLabel.setStyleSheet("QLabel { color: white; }")
         self.ui.balanceLabel.setStyleSheet("QLabel { color: white; }")
+
+        self.ui.peersConnectedLabel.setStyleSheet("QLabel { color: white; }")
+        self.ui.peerPoolLabel.setStyleSheet("QLabel { color: white; }")
+        self.ui.peerStatusLabel.setStyleSheet("QLabel { color: white; }")
+
+        self.ui.hashRateLabel.setStyleSheet("QLabel { color: white; }")
+        self.ui.workingMinerThreadsLabel.setStyleSheet("QLabel { color: white; }")
 
         self.application_config = configparser.ConfigParser()
         self.application_config.read(APPLICATION_PATH + "\\node.cfg")
@@ -691,6 +702,8 @@ class dreamnail:
 
         dreamnail.singleton.log("Loading bench from saved files...")
         self.blockchain, self.peer_pool = dreambench.load_bench()
+        for peer_address in self.peer_pool.keys():
+            self.add_to_peer_pool_gui(peer_address)
         dreamnail.singleton.log("Finished loading bench")
 
         self.win.show()
@@ -789,6 +802,9 @@ class dreamnail:
             else:
                 self.server.close_miner()
         self.ui.minerStateButton.setIcon(QtGui.QIcon("resources:offLogo.png"))
+
+    def peerPoolComboBox_currentIndexChanged(self):
+        self.ui.peerStatusLabel.setText(self.peer_pool[self.ui.peerPoolComboBox.currentText()])
     #endregion
 
     def open_server(self):
@@ -805,6 +821,18 @@ class dreamnail:
         if self.server is not None:
             self.server.close()
             self.server = None
+
+    def add_peer(self, peer_address):
+        self.ui.peersConnectedComboBox.addItem(peer_address)
+        self.ui.peersConnectedLabel.setText(str(int(self.ui.peersConnectedLabel.text()) + 1))
+
+    def remove_peer(self, peer_address):
+        self.ui.peersConnectedComboBox.removeItem(peer_address)
+        self.ui.peersConnectedLabel.setText(str(int(self.ui.peersConnectedLabel.text()) - 1))
+
+    def add_to_peer_pool_gui(self, peer_address):
+        self.ui.peerPoolComboBox.addItem(peer_address)
+        self.ui.peerPoolLabel.setText(str(int(self.ui.peerPoolLabel.text()) + 1))
 
     def log(self, message):
         print(message)

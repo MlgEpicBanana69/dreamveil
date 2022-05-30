@@ -724,18 +724,18 @@
        <bool>false</bool>
       </property>
      </widget>
-     <widget class="QWidget" name="horizontalLayoutWidget_5">
+     <widget class="QWidget" name="horizontalLayoutWidget_9">
       <property name="geometry">
        <rect>
         <x>20</x>
-        <y>180</y>
-        <width>521</width>
-        <height>80</height>
+        <y>350</y>
+        <width>471</width>
+        <height>81</height>
        </rect>
       </property>
-      <layout class="QHBoxLayout" name="peersConnectedLayout">
+      <layout class="QHBoxLayout" name="peerStatusLayout">
        <item>
-        <widget class="QLabel" name="peersConnectedPrefixLabel">
+        <widget class="QLabel" name="peerStatusPrefixLabel">
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -749,70 +749,38 @@
           <bool>false</bool>
          </property>
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;Peers connected:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;Peer status: &lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="peersConnectedLabel">
+        <widget class="QLabel" name="peerStatusLabel">
          <property name="enabled">
           <bool>false</bool>
          </property>
          <property name="font">
           <font>
            <family>Perpetua</family>
-           <pointsize>36</pointsize>
+           <pointsize>32</pointsize>
           </font>
          </property>
          <property name="autoFillBackground">
           <bool>false</bool>
          </property>
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="horizontalSpacer_3">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Fixed</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>10</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="QComboBox" name="peersConnectedComboBox">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>10</height>
-          </size>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;-&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
         </widget>
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="horizontalLayoutWidget_6">
+     <widget class="QWidget" name="horizontalLayoutWidget_10">
       <property name="geometry">
        <rect>
         <x>20</x>
-        <y>270</y>
+        <y>260</y>
         <width>411</width>
-        <height>80</height>
+        <height>81</height>
        </rect>
       </property>
       <layout class="QHBoxLayout" name="peerPoolLayout">
@@ -836,25 +804,6 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="peerPoolLabel">
-         <property name="enabled">
-          <bool>false</bool>
-         </property>
-         <property name="font">
-          <font>
-           <family>Perpetua</family>
-           <pointsize>36</pointsize>
-          </font>
-         </property>
-         <property name="autoFillBackground">
-          <bool>false</bool>
-         </property>
-         <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;0&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <spacer name="horizontalSpacer_4">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
@@ -871,7 +820,111 @@
         </spacer>
        </item>
        <item>
+        <widget class="QLabel" name="peerPoolLabel">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="font">
+          <font>
+           <family>Perpetua</family>
+           <pointsize>36</pointsize>
+          </font>
+         </property>
+         <property name="autoFillBackground">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>0</string>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::PlainText</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QComboBox" name="peerPoolComboBox">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>10</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="horizontalLayoutWidget_11">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>170</y>
+        <width>521</width>
+        <height>81</height>
+       </rect>
+      </property>
+      <layout class="QHBoxLayout" name="peersConnectedLayout">
+       <item>
+        <widget class="QLabel" name="peersConnectedPrefixLabel">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="font">
+          <font>
+           <family>Perpetua</family>
+           <pointsize>36</pointsize>
+          </font>
+         </property>
+         <property name="autoFillBackground">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#ffffff;&quot;&gt;Peers connected:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>10</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QLabel" name="peersConnectedLabel">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="font">
+          <font>
+           <family>Perpetua</family>
+           <pointsize>36</pointsize>
+          </font>
+         </property>
+         <property name="autoFillBackground">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>0</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="peersConnectedComboBox">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
            <horstretch>0</horstretch>
@@ -1037,9 +1090,9 @@
         <height>80</height>
        </rect>
       </property>
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
+      <layout class="QHBoxLayout" name="hashRateLayout">
        <item>
-        <widget class="QLabel" name="label_2">
+        <widget class="QLabel" name="hashRatePrefixLabel">
          <property name="font">
           <font>
            <family>Perpetua</family>
@@ -1052,7 +1105,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="label_4">
+        <widget class="QLabel" name="hashRateLabel">
          <property name="font">
           <font>
            <family>Perpetua</family>
@@ -1075,9 +1128,9 @@
         <height>80</height>
        </rect>
       </property>
-      <layout class="QHBoxLayout" name="horizontalLayout_4">
+      <layout class="QHBoxLayout" name="workingMinerThreadsLayout">
        <item>
-        <widget class="QLabel" name="label_3">
+        <widget class="QLabel" name="workingMinerThreadsPrefixLabel">
          <property name="font">
           <font>
            <family>Perpetua</family>
@@ -1090,7 +1143,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="label_5">
+        <widget class="QLabel" name="workingMinerThreadsLabel">
          <property name="font">
           <font>
            <family>Perpetua</family>
