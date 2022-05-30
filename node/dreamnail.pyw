@@ -691,7 +691,6 @@ class dreamnail:
         self.VERSION = self.application_config["METADATA"]["version"]
 
         self.user_data = dreambench.USER_DATA_TEMPLATE
-        self.balance = 0
 
         self.miner_msg = ""
 
