@@ -54,12 +54,12 @@ class dreamnail:
         PEER_STATUS_UNKNOWN = "UNKNOWN"
         TRUST_HEIGHT = 6
 
-        def __init__(self, version:str, user_key:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, is_miner:bool, miner_msg:str="", port:int=22222, max_peer_amount:int=150):
+        def __init__(self, version:str, user_key:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, miner_msg:str="", port:int=22222, max_peer_amount:int=150):
             if dreamnail.Server.singleton is not None:
                 raise Exception("Singleton class limited to one instance")
             dreamnail.Server.singleton = self
 
-            self.difficulty_target = int(2**16) # 16 zeros TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+            self.difficulty_target = int(2**10) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
             self.user_key = user_key
             self.version = version
             self.address = address
@@ -70,7 +70,7 @@ class dreamnail:
             self.peers = {}
             self.peer_pool = peer_pool
             self.transaction_pool = transaction_pool
-            self.is_miner = is_miner
+            self.miner_open = False
             self.chain_lock = threading.Lock()
             if len(self.blockchain.chain) == 0:
                 self.miner_msg = dreamveil.Blockchain.GENESIS_MESSAGE
@@ -78,7 +78,7 @@ class dreamnail:
                 self.miner_msg = miner_msg
 
             self.closed = False
-            self.miner_thread = threading.Thread(target=self.miner)
+            self.miner_thread = None
             self.seeker_thread = threading.Thread(target=self.seeker)
             self.accepter_thread = threading.Thread(target=self.accepter)
             self.run_thread = threading.Thread(target=self.run)
@@ -109,8 +109,7 @@ class dreamnail:
             self.seeker_thread.start()
 
             dreamnail.singleton.log("Server is now running...")
-            if self.is_miner:
-                self.miner_thread.start()
+
             while not self.closed:
                 dreamnail.singleton.log(f"### {len(self.peers)}/{self.max_peer_amount} connected. Current peer pool size: {len(self.peer_pool)} Current blockchain length and mass {len(self.blockchain.chain)} {self.blockchain.mass}")
                 start = timeit.default_timer()
@@ -188,6 +187,7 @@ class dreamnail:
                 peer.close()
 
             self.closed = True
+            dreamnail.Server.singleton = None
 
         def add_to_transaction_pool(self, transaction:dreamveil.Transaction):
             self.transaction_pool.append(transaction)
@@ -201,39 +201,53 @@ class dreamnail:
 
         def miner(self):
             # TODO: Properly and fully implement
+            dreamnail.singleton.log("Miner started")
             transaction_pool_len = None
             my_chain_len = None
             my_address = dreamveil.key_to_address(self.user_key.public_key())
-            while not self.closed:
-                # Refresh the currently mined block when a new transaction is added to the pool
-                # Also refresh the block once our top block changes (We chained a block.)
-                if len(self.transaction_pool) != transaction_pool_len or len(self.blockchain.chain) != my_chain_len:
-                    transaction_pool_len = len(self.transaction_pool)
-                    my_chain_len = len(self.blockchain.chain)
-                    top_bk_hash = self.blockchain.chain[-1].block_hash if len(self.blockchain.chain) > 0 else ""
-                    mined_block = dreamveil.Block(top_bk_hash, [], "", "")
-                    block_reward = self.blockchain.calculate_block_reward(len(self.blockchain.chain))
-                    for pool_transaction in self.transaction_pool:
-                        try:
-                            block_reward += pool_transaction.get_miner_fee()
-                            mined_block.add_transaction(pool_transaction)
-                            if not dreamveil.Block.verify_transactions(mined_block.transactions) or self.blockchain.verify_block(mined_block, len(self.blockchain.chain)):
-                                mined_block.remove_transaction(pool_transaction)
-                        except ValueError:
-                            break
-                    miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, self.miner_msg, "", "").sign(self.user_key)
-                    mined_block.add_transaction(miner_reward_transaction)
+            try:
+                while not self.closed and self.miner_open:
+                    # Refresh the currently mined block when a new transaction is added to the pool
+                    # Also refresh the block once our top block changes (We chained a block.)
+                    if len(self.transaction_pool) != transaction_pool_len or len(self.blockchain.chain) != my_chain_len:
+                        transaction_pool_len = len(self.transaction_pool)
+                        my_chain_len = len(self.blockchain.chain)
+                        top_bk_hash = self.blockchain.chain[-1].block_hash if len(self.blockchain.chain) > 0 else ""
+                        mined_block = dreamveil.Block(top_bk_hash, [], "", "")
+                        block_reward = self.blockchain.calculate_block_reward(len(self.blockchain.chain))
+                        for pool_transaction in self.transaction_pool:
+                            try:
+                                block_reward += pool_transaction.get_miner_fee()
+                                mined_block.add_transaction(pool_transaction)
+                                if not dreamveil.Block.verify_transactions(mined_block.transactions) or self.blockchain.verify_block(mined_block, len(self.blockchain.chain)):
+                                    mined_block.remove_transaction(pool_transaction)
+                            except ValueError:
+                                break
+                        miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, self.miner_msg, "", "").sign(self.user_key)
+                        mined_block.add_transaction(miner_reward_transaction)
 
-                if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
-                    if self.try_chain_block(mined_block):
-                        dreamnail.singleton.log(f"### MINED BLOCK {mined_block.block_hash}")
+                    if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
+                        if self.try_chain_block(mined_block):
+                            dreamnail.singleton.log(f"### MINED BLOCK {mined_block.block_hash}")
+                        else:
+                            dreamnail.singleton.log(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
+                            with open(APPLICATION_PATH + f"\\bench\\POWfailed\\{mined_block.block_hash}.json.old", "w+", encoding="utf-8") as backup_file:
+                                backup_file.write(mined_block.dumps())
+                            mined_block.mine()
                     else:
-                        dreamnail.singleton.log(f"!!! FAILED TO CHAIN MINED BLOCK WITH THAT PASSED POW ({mined_block.block_hash}, {mined_block.nonce})\n   SAVING BLOCK TO POWfailed")
-                        with open(APPLICATION_PATH + f"\\bench\\POWfailed\\{mined_block.block_hash}.json.old", "w+", encoding="utf-8") as backup_file:
-                            backup_file.write(mined_block.dumps())
                         mined_block.mine()
-                else:
-                    mined_block.mine()
+            finally:
+                dreamnail.singleton.log("Miner is now shutdown.")
+
+        def start_miner(self):
+            if not self.miner_open:
+                self.miner_thread = threading.Thread(target=self.miner)
+                self.miner_thread.start()
+                self.miner_open = True
+
+        def close_miner(self):
+            if self.miner_open:
+                self.miner_open = False
 
         def try_chain_block(self, block, exclusions:list=None):
             """Attempts to chain a given block to the current blockchain.
@@ -655,6 +669,11 @@ class dreamnail:
         self.ui.registerButton.clicked.connect(self.registerButton_clicked)
         self.ui.usernameLineEdit.textChanged.connect(self.usernameLineEdit_textChanged)
         self.ui.passwordLineEdit.textChanged.connect(self.passwordLineEdit_textChanged)
+        self.ui.minerMsgTextEdit.textChanged.connect(self.minerMsgTextEdit_textChanged)
+        self.ui.minerStateButton.clicked.connect(self.minerStateButton_clicked)
+
+        self.ui.userLabel.setStyleSheet("QLabel { color: white; }")
+        self.ui.balanceLabel.setStyleSheet("QLabel { color: white; }")
 
         self.application_config = configparser.ConfigParser()
         self.application_config.read(APPLICATION_PATH + "\\node.cfg")
@@ -694,8 +713,8 @@ class dreamnail:
                 self.ui.ServerTab.setEnabled(True)
                 self.ui.tabWidget.setCurrentIndex(2)
 
-                self.ui.userLabel = self.user_data["username"]
-                self.ui.balanceLabel = self.user_data["balance"]
+                self.ui.userLabel.setText(self.user_data["username"])
+                self.ui.balanceLabel.setText(str(self.user_data["balance"]))
             else:
                 QtWidgets.QMessageBox.critical(self.win, "Failed to login", "Invalid password.")
         else:
@@ -708,8 +727,8 @@ class dreamnail:
         self.ui.tabWidget.setCurrentIndex(1)
 
         self.user_data = dreambench.USER_DATA_TEMPLATE
-        self.ui.userLabel = self.user_data["username"]
-        self.ui.balanceLabel = self.user_data["balance"]
+        self.ui.userLabel.setText(self.user_data["username"])
+        self.ui.balanceLabel.setText(str(self.user_data["balance"]))
 
     def usernameLineEdit_textChanged(self):
         if self.ui.usernameLineEdit.text().isalnum() and len(self.ui.passwordLineEdit.text()) > 0:
@@ -746,6 +765,7 @@ class dreamnail:
             self.ui.MinerTab.setEnabled(False)
             self.ui.TransactionEditorTab.setEnabled(False)
             self.ui.serverStateButton.setIcon(QtGui.QIcon("resources:offLogo.png"))
+            self.ui.minerStateButton.setIcon(QtGui.QIcon("resources:offLogo.png"))
 
     def registerButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
@@ -755,18 +775,31 @@ class dreamnail:
             self.loginButton_clicked()
         else:
             QtWidgets.QMessageBox.critical(self.win, "Failed to register new user", "User already exists!")
+
+    def minerMsgTextEdit_textChanged(self):
+        if self.server is not None:
+            self.server.miner_msg = self.ui.minerMsgTextEdit.toPlainText()
+
+    def minerStateButton_clicked(self):
+        if self.server is not None:
+            if self.server.miner_open == False:
+                self.server.start_miner()
+                self.ui.minerStateButton.setIcon(QtGui.QIcon("resources:onLogo.png"))
+                return
+            else:
+                self.server.close_miner()
+        self.ui.minerStateButton.setIcon(QtGui.QIcon("resources:offLogo.png"))
     #endregion
 
     def open_server(self):
-        # self.server = Server(VERSION, user_key[0], blockchain, peer_pool, [], application_config["SERVER"]["address"], True, port=int(application_config["SERVER"]["port"]))
         server_version = self.application_config["METADATA"]["version"]
         server_address = self.application_config["SERVER"]["address"]
-        server_is_miner = True # TODO: implement
         server_port = int(self.application_config["SERVER"]["port"])
 
-        self.server = dreamnail.Server(server_version, self.user_data["key"], self.blockchain,
-                            self.peer_pool, self.transaction_pool, server_address,
-                            server_is_miner, self.miner_msg, server_port)
+        self.server = dreamnail.Server(server_version, self.user_data["key"],
+                                       self.blockchain, self.peer_pool,
+                                       self.transaction_pool, server_address,
+                                       self.miner_msg, server_port)
 
     def close_server(self):
         if self.server is not None:
