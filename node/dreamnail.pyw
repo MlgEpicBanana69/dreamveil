@@ -287,6 +287,7 @@ class dreamnail:
             dreamnail.Connection.connection_lock.acquire()
             try:
                 self.lock = threading.Lock()
+                self.lock.acquire()
                 self.last_message = None
                 self.socket = socket
                 self.address = address
@@ -308,7 +309,6 @@ class dreamnail:
             self.setup()
 
         def setup(self):
-            self.lock.acquire()
             try:
                 # Check that node versions match
                 peer_version = None
@@ -353,12 +353,11 @@ class dreamnail:
 
                 dreamnail.singleton.log(f"### Connection with {self.address} completed setup (version: {peer_version})")
                 self.completed_setup = True
+                self.lock.release()
             except (AssertionError, TimeoutError, ValueError) as err:
                 dreamnail.singleton.log(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {type(err)}: {err.args}")
                 # Terminate the connection
                 self.close()
-            finally:
-                self.lock.release()
 
         def run(self):
             while not self.closed:
