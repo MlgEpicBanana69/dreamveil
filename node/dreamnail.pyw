@@ -17,6 +17,7 @@ import socket
 import time
 
 from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
@@ -68,7 +69,7 @@ class dreamnail:
             self.peer_pool = dreamnail.singleton.peer_pool
             self.transaction_pool = dreamnail.singleton.transaction_pool
 
-            self.difficulty_target = int(2**16) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+            self.difficulty_target = int(2**4) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
             self.peers = {}
             self.miner_open = False
             self.socket = None
@@ -180,8 +181,8 @@ class dreamnail:
             """Terminated the server and all of its ongoing connections"""
             dreamnail.singleton.log("### SHUTTING DOWN SERVER")
             self.socket.close()
-            for peer in self.peers:
-                peer.close()
+            for conn in self.peers.values():
+                conn.close()
 
             self.closed = True
             dreamnail.Server.singleton = None
@@ -706,7 +707,7 @@ class dreamnail:
         self.application_config.read(APPLICATION_PATH + "\\node.cfg")
         self.VERSION = self.application_config["METADATA"]["version"]
 
-        self.user_data = dreambench.USER_DATA_TEMPLATE
+        self.user_data = dreambench.USER_DATA_TEMPLATE.copy()
         self.miner_msg = ""
 
         self.server = None
@@ -731,7 +732,8 @@ class dreamnail:
 
     def loginButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
-        passphrase = self.ui.passwordLineEdit.text()
+        passphrase = SHA256.new(self.ui.passwordLineEdit.text().encode()).hexdigest()
+        self.user_passphrase = passphrase
 
         if os.path.isfile(APPLICATION_PATH + f"\\bench\\users\\{username}"):
             user_data = dreambench.try_read_user_file(passphrase, username)
@@ -757,8 +759,9 @@ class dreamnail:
         self.ui.UserTab.setEnabled(False)
         self.ui.ServerTab.setEnabled(False)
         self.ui.tabWidget.setCurrentIndex(1)
+        self.user_passphrase = None
 
-        self.user_data = dreambench.USER_DATA_TEMPLATE
+        self.user_data = dreambench.USER_DATA_TEMPLATE.copy()
         self.ui.userLabel.setText(self.user_data["username"])
         self.ui.balanceLabel.setText(str(self.user_data["balance"]))
 
@@ -801,7 +804,8 @@ class dreamnail:
 
     def registerButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
-        passphrase = self.ui.passwordLineEdit.text()
+        passphrase = SHA256.new(self.ui.passwordLineEdit.text().encode()).hexdigest()
+        self.user_passphrase = passphrase
 
         if dreambench.try_create_user(passphrase, username):
             self.loginButton_clicked()
@@ -990,7 +994,7 @@ class dreamnail:
     def remove_peer(self, peer_address):
         for i in range(self.ui.peersConnectedComboBox.count()):
             if self.ui.peersConnectedComboBox.itemText(i) == peer_address:
-                self.ui.peersConnectedComboBox.removeItem(peer_address)
+                self.ui.peersConnectedComboBox.removeItem(i)
         self.ui.peersConnectedLabel.setText(str(int(self.ui.peersConnectedLabel.text()) - 1))
 
     def add_to_peer_pool_gui(self, peer_address):
@@ -1003,7 +1007,11 @@ class dreamnail:
 
     def exit_handler(self):
         self.close_server()
-        self.log("Exit")
+        dreambench.write_blockchain_file(self.blockchain)
+        dreambench.write_peer_pool_file(self.peer_pool)
+        if self.user_data != dreambench.USER_DATA_TEMPLATE and self.user_passphrase is not None:
+            dreambench.write_user_file(self.user_passphrase, self.user_data)
+        self.log("Exit sus")
 
 if __name__ == '__main__':
     application = dreamnail()

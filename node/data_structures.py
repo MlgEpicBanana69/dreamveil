@@ -153,27 +153,30 @@ class AVL:
 
     @staticmethod
     def loads(avl_json):
-        all_nodes = [binary_tree_node.loads(node) for node in avl_json.split("\x00")]
-        output_tree = AVL()
-        output_tree.tree = all_nodes[0]
-        for i in range(int(math.log(len(all_nodes), 2))):
-            curr_parents = all_nodes[2**i - 1: 2**(i+1) - 1]
-            curr_children = all_nodes[2**(i+1) - 1:2**(i+2)-1]
-            for parent in curr_parents:
-                if parent is not None:
-                    parent.height = 1 + int(math.log(len(all_nodes), 2)) - i
-            for child in curr_children:
-                if child is not None:
-                    child.height = 1 + int(math.log(len(all_nodes), 2)) - (i + 1)
+        if avl_json != '':
+            all_nodes = [binary_tree_node.loads(node) for node in avl_json.split("\x00")]
+            output_tree = AVL()
+            output_tree.tree = all_nodes[0]
+            for i in range(int(math.log(len(all_nodes), 2))):
+                curr_parents = all_nodes[2**i - 1: 2**(i+1) - 1]
+                curr_children = all_nodes[2**(i+1) - 1:2**(i+2)-1]
+                for parent in curr_parents:
+                    if parent is not None:
+                        parent.height = 1 + int(math.log(len(all_nodes), 2)) - i
+                for child in curr_children:
+                    if child is not None:
+                        child.height = 1 + int(math.log(len(all_nodes), 2)) - (i + 1)
 
-            for c, child in enumerate(curr_children):
-                parent = curr_parents[c//2]
-                if parent is not None:
-                    if c % 2 == 0:
-                        parent.left = curr_children[c]
-                    else:
-                        parent.right = curr_children[c]
-        return output_tree
+                for c, child in enumerate(curr_children):
+                    parent = curr_parents[c//2]
+                    if parent is not None:
+                        if c % 2 == 0:
+                            parent.left = curr_children[c]
+                        else:
+                            parent.right = curr_children[c]
+            return output_tree
+        else:
+            return AVL()
 
 class multifurcasting_node:
     def __init__(self, value):

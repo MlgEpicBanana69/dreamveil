@@ -413,7 +413,7 @@ class Blockchain:
         return True
 
     def dumps(self):
-        information = [self.chain, self.mass, self.unspent_transactions_tree.dumps()]
+        information = [[block.dumps() for block in self.chain], self.mass, self.unspent_transactions_tree.dumps()]
         return json.dumps(information)
 
     @staticmethod
@@ -424,8 +424,8 @@ class Blockchain:
                 assert type(json_obj) == list
                 assert len(json_obj) == 3
                 assert type(json_obj[0]) == list
-                for i, block_json in enumerate(json_obj[0]):
-                    json_obj[i] = Block.loads(block_json)
+                for i in range(len(json_obj[0])):
+                    json_obj[0][i] = Block.loads(json_obj[0][i])
                 assert type(json_obj[1]) == int
                 json_obj[2] = data_structures.AVL.loads(json_obj[2])
 
