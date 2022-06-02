@@ -54,28 +54,25 @@ class dreamnail:
         PEER_STATUS_UNKNOWN = "UNKNOWN"
         TRUST_HEIGHT = 6
 
-        def __init__(self, version:str, user_key:RSA.RsaKey, blockchain:dreamveil.Blockchain, peer_pool:dict, transaction_pool:list, address:str, miner_msg:str="", port:int=22222, max_peer_amount:int=150):
+        def __init__(self, address:str, port:int=22222, max_peer_amount:int=150):
             if dreamnail.Server.singleton is not None:
                 raise Exception("Singleton class limited to one instance")
             dreamnail.Server.singleton = self
 
-            self.difficulty_target = int(2**10) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
-            self.user_key = user_key
-            self.version = version
             self.address = address
             self.port = port
             self.max_peer_amount = max_peer_amount
-            self.socket = None
-            self.blockchain = blockchain
+            self.user_key = dreamnail.singleton.user_data["key"]
+            self.version = dreamnail.singleton.VERSION
+            self.blockchain = dreamnail.singleton.blockchain
+            self.peer_pool = dreamnail.singleton.peer_pool
+            self.transaction_pool = dreamnail.singleton.transaction_pool
+
+            self.difficulty_target = int(2**16) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
             self.peers = {}
-            self.peer_pool = peer_pool
-            self.transaction_pool = transaction_pool
             self.miner_open = False
+            self.socket = None
             self.chain_lock = threading.Lock()
-            if len(self.blockchain.chain) == 0:
-                self.miner_msg = dreamveil.Blockchain.GENESIS_MESSAGE
-            else:
-                self.miner_msg = miner_msg
 
             self.closed = False
             self.miner_thread = None
@@ -223,7 +220,8 @@ class dreamnail:
                                     mined_block.remove_transaction(pool_transaction)
                             except ValueError:
                                 break
-                        miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, self.miner_msg, "", "").sign(self.user_key)
+                        curr_miner_msg = dreamnail.singleton.miner_msg if len(self.blockchain.chain) > 0 else dreamveil.Blockchain.GENESIS_MESSAGE
+                        miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, curr_miner_msg, "", "").sign(self.user_key)
                         mined_block.add_transaction(miner_reward_transaction)
 
                     if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
@@ -259,8 +257,8 @@ class dreamnail:
             try:
                 if self.blockchain.chain_block(block):
                     dreamnail.singleton.log(f"### SUCCESFULY CHAINED BLOCK {block.block_hash}")
-                    if len(self.blockchain.chain) == 1:
-                        self.miner_msg = ""
+                    if dreamnail.singleton.ui.tabWidget.currentIndex() == 3:
+                        dreamnail.singleton.updateBlockchainExplorerTab()
                     for transaction in block.transactions:
                         if "BLOCK" not in transaction.inputs:
                             if transaction in self.transaction_pool:
@@ -666,6 +664,7 @@ class dreamnail:
         self.ui.setupUi(self.win)
 
         self.win.closeEvent = lambda event: dreamnail.singleton.exit_handler()
+        self.ui.tabWidget.currentChanged.connect(self.tabWidget_currentChanged)
         self.ui.loginButton.clicked.connect(self.loginButton_clicked)
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
         self.ui.serverStateButton.clicked.connect(self.serverStateButton_clicked)
@@ -675,6 +674,13 @@ class dreamnail:
         self.ui.minerMsgTextEdit.textChanged.connect(self.minerMsgTextEdit_textChanged)
         self.ui.minerStateButton.clicked.connect(self.minerStateButton_clicked)
         self.ui.peerPoolComboBox.currentIndexChanged.connect(self.peerPoolComboBox_currentIndexChanged)
+        self.ui.blockchainNextButton.clicked.connect(self.blockchainNextButton_clicked)
+        self.ui.blockchainPreviousButton.clicked.connect(self.blockchainPreviousButton_clicked)
+        self.ui.gotoBlockButton.clicked.connect(self.gotoBlockButton_clicked)
+        self.ui.Block1TransactionCombobox.currentTextChanged.connect(self.Block1TransactionCombobox_currentTextChanged)
+        self.ui.Block2TransactionCombobox.currentTextChanged.connect(self.Block2TransactionCombobox_currentTextChanged)
+        self.ui.Block3TransactionCombobox.currentTextChanged.connect(self.Block3TransactionCombobox_currentTextChanged)
+        self.ui.Block4TransactionCombobox.currentTextChanged.connect(self.Block4TransactionCombobox_currentTextChanged)
 
         self.ui.userLabel.setStyleSheet("QLabel { color: white; }")
         self.ui.balanceLabel.setStyleSheet("QLabel { color: white; }")
@@ -686,12 +692,21 @@ class dreamnail:
         self.ui.hashRateLabel.setStyleSheet("QLabel { color: white; }")
         self.ui.workingMinerThreadsLabel.setStyleSheet("QLabel { color: white; }")
 
+        self.ui.blockchainMassLabel.setStyleSheet("QLabel { color: white; }")
+        self.ui.Block1HashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+        self.ui.Block1PrevHashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+        self.ui.Block2HashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+        self.ui.Block2PrevHashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+        self.ui.Block3HashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+        self.ui.Block3PrevHashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+        self.ui.Block4HashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+        self.ui.Block4PrevHashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
+
         self.application_config = configparser.ConfigParser()
         self.application_config.read(APPLICATION_PATH + "\\node.cfg")
         self.VERSION = self.application_config["METADATA"]["version"]
 
         self.user_data = dreambench.USER_DATA_TEMPLATE
-
         self.miner_msg = ""
 
         self.server = None
@@ -709,6 +724,11 @@ class dreamnail:
         sys.exit(self.app.exec())
 
     #region ui events
+    def tabWidget_currentChanged(self):
+        match self.ui.tabWidget.currentIndex():
+            case 3:
+                self.updateBlockchainExplorerTab()
+
     def loginButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
         passphrase = self.ui.passwordLineEdit.text()
@@ -789,8 +809,7 @@ class dreamnail:
             QtWidgets.QMessageBox.critical(self.win, "Failed to register new user", "User already exists!")
 
     def minerMsgTextEdit_textChanged(self):
-        if self.server is not None:
-            self.server.miner_msg = self.ui.minerMsgTextEdit.toPlainText()
+        self.miner_msg = self.ui.minerMsgTextEdit.toPlainText()
 
     def minerStateButton_clicked(self):
         if self.server is not None:
@@ -804,17 +823,160 @@ class dreamnail:
 
     def peerPoolComboBox_currentIndexChanged(self):
         self.ui.peerStatusLabel.setText(self.peer_pool[self.ui.peerPoolComboBox.currentText()])
+
+    def blockchainNextButton_clicked(self):
+        current_block_index = int(self.ui.BlockchainTallyLabel.text().split('/')[0])
+        if current_block_index + 4 <= len(self.blockchain.chain):
+            current_block_index += 4
+            self.ui.BlockchainTallyLabel.setText(f"{str(current_block_index)}/{len(self.blockchain.chain)}")
+            self.updateBlockchainExplorerTab()
+
+    def blockchainPreviousButton_clicked(self):
+        current_block_index = int(self.ui.BlockchainTallyLabel.text().split('/')[0])
+        if current_block_index == 1:
+            return
+        current_block_index = max(current_block_index-4, 1)
+        self.ui.BlockchainTallyLabel.setText(f"{str(current_block_index)}/{len(self.blockchain.chain)}")
+        self.updateBlockchainExplorerTab()
+
+    def gotoBlockButton_clicked(self):
+        try:
+            seeked_block_index = int(self.ui.gotoBlockLineEdit.text())
+        except ValueError:
+            return
+        if seeked_block_index <= len(self.blockchain.chain) and seeked_block_index > 0:
+            self.ui.BlockchainTallyLabel.setText(f"{str(seeked_block_index)}/{len(self.blockchain.chain)}")
+            self.updateBlockchainExplorerTab()
+
+    def Block1TransactionCombobox_currentTextChanged(self):
+        current_transaction_signature = self.ui.Block1TransactionCombobox.currentText()
+        if current_transaction_signature == "":
+            return
+        current_block_index = int(self.ui.BlockchainTallyLabel.text().split('/')[0]) - 1
+        current_block = self.blockchain.chain[current_block_index]
+        for transaction in current_block.transactions:
+            if transaction.signature == current_transaction_signature:
+                self.ui.Block1TransactionInputCombobox.clear()
+                for input_source, input_value in transaction.inputs.items():
+                    self.ui.Block1TransactionInputCombobox.addItem(f"{input_value} - {input_source}")
+                self.ui.Block1TransactionOutputCombobox.clear()
+                for output_source, output_value in transaction.outputs.items():
+                    self.ui.Block1TransactionOutputCombobox.addItem(f"{output_value} - {output_source}")
+                self.ui.block1TextBrowser.setText(transaction.message)
+
+    def Block2TransactionCombobox_currentTextChanged(self):
+        current_transaction_signature = self.ui.Block2TransactionCombobox.currentText()
+        if current_transaction_signature == "":
+            return
+        current_block_index = int(self.ui.BlockchainTallyLabel.text().split('/')[0])
+        current_block = self.blockchain.chain[current_block_index]
+        for transaction in current_block.transactions:
+            if transaction.signature == current_transaction_signature:
+                self.ui.Block2TransactionInputCombobox.clear()
+                for input_source, input_value in transaction.inputs.items():
+                    self.ui.Block2TransactionInputCombobox.addItem(f"{input_value} - {input_source}")
+                self.ui.Block2TransactionOutputCombobox.clear()
+                for output_source, output_value in transaction.outputs.items():
+                    self.ui.Block2TransactionOutputCombobox.addItem(f"{output_value} - {output_source}")
+                self.ui.block2TextBrowser.setText(transaction.message)
+
+    def Block3TransactionCombobox_currentTextChanged(self):
+        current_transaction_signature = self.ui.Block3TransactionCombobox.currentText()
+        if current_transaction_signature == "":
+            return
+        current_block_index = int(self.ui.BlockchainTallyLabel.text().split('/')[0]) + 1
+        current_block = self.blockchain.chain[current_block_index]
+        for transaction in current_block.transactions:
+            if transaction.signature == current_transaction_signature:
+                self.ui.Block3TransactionInputCombobox.clear()
+                for input_source, input_value in transaction.inputs.items():
+                    self.ui.Block3TransactionInputCombobox.addItem(f"{input_value} - {input_source}")
+                self.ui.Block3TransactionOutputCombobox.clear()
+                for output_source, output_value in transaction.outputs.items():
+                    self.ui.Block3TransactionOutputCombobox.addItem(f"{output_value} - {output_source}")
+                self.ui.block3TextBrowser.setText(transaction.message)
+
+    def Block4TransactionCombobox_currentTextChanged(self):
+        current_transaction_signature = self.ui.Block4TransactionCombobox.currentText()
+        if current_transaction_signature == "":
+            return
+        current_block_index = int(self.ui.BlockchainTallyLabel.text().split('/')[0]) + 2
+        current_block = self.blockchain.chain[current_block_index]
+        for transaction in current_block.transactions:
+            if transaction.signature == current_transaction_signature:
+                self.ui.Block4TransactionInputCombobox.clear()
+                for input_source, input_value in transaction.inputs.items():
+                    self.ui.Block4TransactionInputCombobox.addItem(f"{input_value} - {input_source}")
+                self.ui.Block4TransactionOutputCombobox.clear()
+                for output_source, output_value in transaction.outputs.items():
+                    self.ui.Block4TransactionOutputCombobox.addItem(f"{output_value} - {output_source}")
+                self.ui.block4TextBrowser.setText(transaction.message)
+    #endregion
+
+    #region Tab updates
+    def updateBlockchainExplorerTab(self):
+        current_block_index = int(self.ui.BlockchainTallyLabel.text().split('/')[0])
+        self.ui.BlockchainTallyLabel.setText(f"{str(current_block_index)}/{len(self.blockchain.chain)}")
+        self.ui.blockchainMassLabel.setText(str(self.blockchain.mass))
+
+        for i in range(4):
+            block_index = current_block_index + i - 1
+            if len(self.blockchain.chain) > block_index:
+                current_block = self.blockchain.chain[block_index]
+            else:
+                # Initialze empty block
+                current_block = dreamveil.Block("", [], "", "")
+
+            if i+1 == 1:
+                if self.ui.Block1HashLabel.text() != current_block.block_hash:
+                    self.ui.Block1HashLabel.setText(current_block.block_hash)
+                    self.ui.Block1PrevHashLabel.setText(current_block.previous_block_hash)
+                    self.ui.Block1TransactionCombobox.clear()
+                    self.ui.block1TextBrowser.setText("")
+                    self.ui.Block1TransactionInputCombobox.clear()
+                    self.ui.Block1TransactionOutputCombobox.clear()
+
+                    for transaction in current_block.transactions:
+                        self.ui.Block1TransactionCombobox.addItem(transaction.signature)
+            elif i+1 == 2:
+                if self.ui.Block2HashLabel.text() != current_block.block_hash:
+                    self.ui.Block2HashLabel.setText(current_block.block_hash)
+                    self.ui.Block2PrevHashLabel.setText(current_block.previous_block_hash)
+                    self.ui.Block2TransactionCombobox.clear()
+                    self.ui.block2TextBrowser.setText("")
+                    self.ui.Block2TransactionInputCombobox.clear()
+                    self.ui.Block2TransactionOutputCombobox.clear()
+
+                    for transaction in current_block.transactions:
+                        self.ui.Block2TransactionCombobox.addItem(transaction.signature)
+            elif i+1 == 3:
+                if self.ui.Block3HashLabel.text() != current_block.block_hash:
+                    self.ui.Block3HashLabel.setText(current_block.block_hash)
+                    self.ui.Block3PrevHashLabel.setText(current_block.previous_block_hash)
+                    self.ui.Block3TransactionCombobox.clear()
+                    self.ui.block3TextBrowser.setText("")
+                    self.ui.Block3TransactionInputCombobox.clear()
+                    self.ui.Block3TransactionOutputCombobox.clear()
+
+                    for transaction in current_block.transactions:
+                        self.ui.Block3TransactionCombobox.addItem(transaction.signature)
+            else:
+                if self.ui.Block4HashLabel.text() != current_block.block_hash:
+                    self.ui.Block4HashLabel.setText(current_block.block_hash)
+                    self.ui.Block4PrevHashLabel.setText(current_block.previous_block_hash)
+                    self.ui.Block4TransactionCombobox.clear()
+                    self.ui.block4TextBrowser.setText("")
+                    self.ui.Block4TransactionInputCombobox.clear()
+                    self.ui.Block4TransactionOutputCombobox.clear()
+
+                    for transaction in current_block.transactions:
+                        self.ui.Block4TransactionCombobox.addItem(transaction.signature)
     #endregion
 
     def open_server(self):
-        server_version = self.application_config["METADATA"]["version"]
         server_address = self.application_config["SERVER"]["address"]
         server_port = int(self.application_config["SERVER"]["port"])
-
-        self.server = dreamnail.Server(server_version, self.user_data["key"],
-                                       self.blockchain, self.peer_pool,
-                                       self.transaction_pool, server_address,
-                                       self.miner_msg, server_port)
+        self.server = dreamnail.Server(server_address, server_port)
 
     def close_server(self):
         if self.server is not None:
