@@ -988,7 +988,9 @@ class dreamnail:
         self.ui.peersConnectedLabel.setText(str(int(self.ui.peersConnectedLabel.text()) + 1))
 
     def remove_peer(self, peer_address):
-        self.ui.peersConnectedComboBox.removeItem(peer_address)
+        for i in range(self.ui.peersConnectedComboBox.count()):
+            if self.ui.peersConnectedComboBox.itemText(i) == peer_address:
+                self.ui.peersConnectedComboBox.removeItem(peer_address)
         self.ui.peersConnectedLabel.setText(str(int(self.ui.peersConnectedLabel.text()) - 1))
 
     def add_to_peer_pool_gui(self, peer_address):
