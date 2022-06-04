@@ -666,6 +666,7 @@ class dreamnail:
             raise Exception("Singleton object limited to one instance.")
         dreamnail.singleton = self
         QtCore.QDir.addSearchPath("resources", APPLICATION_PATH + "/resources/")
+        self.exited = False
         atexit.register(self.exit_handler)
 
         self.app = QApplication(sys.argv)
@@ -673,7 +674,7 @@ class dreamnail:
         self.ui = dreamui.Ui_MainWindow()
         self.ui.setupUi(self.win)
 
-        self.win.closeEvent = lambda event: sys.exit()
+        self.win.closeEvent = lambda event: self.exit_handler()
         self.ui.tabWidget.currentChanged.connect(self.tabWidget_currentChanged)
         self.ui.loginButton.clicked.connect(self.loginButton_clicked)
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
@@ -1127,12 +1128,14 @@ class dreamnail:
         self.ui.logTextBrowser.append(f"{message}")
 
     def exit_handler(self):
-        self.close_server()
-        dreambench.write_blockchain_file(self.blockchain)
-        dreambench.write_peer_pool_file(self.peer_pool)
-        if self.user_data != dreambench.USER_DATA_TEMPLATE and self.user_passphrase is not None:
-            dreambench.write_user_file(self.user_passphrase, self.user_data)
-        self.log("Application Exit")
+        if not self.exited:
+            self.close_server()
+            dreambench.write_blockchain_file(self.blockchain)
+            dreambench.write_peer_pool_file(self.peer_pool)
+            if self.user_data != dreambench.USER_DATA_TEMPLATE and self.user_passphrase is not None:
+                dreambench.write_user_file(self.user_passphrase, self.user_data)
+            self.log("Application Exit")
+            self.exited = True
 
 if __name__ == '__main__':
     application = dreamnail()
