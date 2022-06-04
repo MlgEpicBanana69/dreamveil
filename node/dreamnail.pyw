@@ -12,6 +12,7 @@ import math
 import timeit
 import socket
 import time
+import atexit
 import pyperclip
 import decimal
 
@@ -665,13 +666,14 @@ class dreamnail:
             raise Exception("Singleton object limited to one instance.")
         dreamnail.singleton = self
         QtCore.QDir.addSearchPath("resources", APPLICATION_PATH + "/resources/")
+        atexit.register(self.exit_handler)
 
         self.app = QApplication(sys.argv)
         self.win = QMainWindow()
         self.ui = dreamui.Ui_MainWindow()
         self.ui.setupUi(self.win)
 
-        self.win.closeEvent = lambda event: dreamnail.singleton.exit_handler()
+        self.win.closeEvent = lambda event: sys.exit()
         self.ui.tabWidget.currentChanged.connect(self.tabWidget_currentChanged)
         self.ui.loginButton.clicked.connect(self.loginButton_clicked)
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
