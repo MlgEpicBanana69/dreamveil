@@ -184,7 +184,7 @@ class dreamnail:
 
         def add_to_transaction_pool(self, transaction:dreamveil.Transaction):
             self.transaction_pool.append(transaction)
-            self.transaction_pool.sort(key=transaction.calculate_efficiency)
+            self.transaction_pool.sort(key=dreamveil.Transaction.calculate_efficiency)
 
         def find_in_transaction_pool(self, signature:str):
             for tr in self.transaction_pool:

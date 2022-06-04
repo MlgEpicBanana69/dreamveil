@@ -154,8 +154,9 @@ class Transaction:
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce]
         return json.dumps(information)
 
-    def calculate_efficiency(self):
-        return self.get_miner_fee() / to_decimal(len(self.dumps()))
+    @staticmethod
+    def calculate_efficiency(transaction):
+        return transaction.get_miner_fee() / to_decimal(len(transaction.dumps()))
 
     def get_miner_fee(self):
         """
