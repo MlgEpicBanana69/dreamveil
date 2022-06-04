@@ -173,16 +173,6 @@ class Transaction:
                 return to_decimal(output_value)
         return to_decimal(0)
 
-    def calculate_transaction_gain(self, address):
-        output = to_decimal(0)
-        for input_address, input_value in self.inputs.items():
-            if input_address == address:
-                output -= to_decimal(input_value)
-        for output_address, output_value in self.outputs.items():
-            if output_address == address:
-                output += to_decimal(output_value)
-        return output
-
 class Block:
     MAX_SIZE = 2097152 # Maximum block size in bytes (2MB)
 

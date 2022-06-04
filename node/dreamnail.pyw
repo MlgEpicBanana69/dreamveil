@@ -270,12 +270,16 @@ class dreamnail:
                             if transaction in self.transaction_pool:
                                 self.transaction_pool.remove(transaction)
 
-                    user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
-                    if user_address in self.blockchain.tracked:
-                        new_balance = dreamveil.to_decimal(0)
-                        for relevant_transaction_block_index, tx_sign in self.blockchain.tracked[user_address]:
+                        user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
+                        new_balance = decimal.Decimal(0)
+                        input_transactions = {}
+                        for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
                             for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
-                                new_balance += transaction.calculate_transaction_gain(user_address)
+                                if transaction.signature == transaction_signature:
+                                    transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
+                                    if transaction_value is not None:
+                                        new_balance += dreamveil.to_decimal(transaction_value)
+                                        input_transactions[transaction.signature] = transaction_value
                         dreamnail.singleton.user_data["balance"] = new_balance
 
                     current_peer_addresses = list(self.peers.keys())
@@ -525,8 +529,9 @@ class dreamnail:
                         self.send("continue")
 
                     # We swap the blockchain objects to the new larger one.
-                    new_blockchain.tracked = dreamnail.Server.singleton.blockchain.tracked
-                    dreamnail.Server.singleton.blockchain = new_blockchain
+                    new_blockchain.tracked = dreamnail.Server.singleton.blockchain.tracked.copy()
+                    dreamnail.singleton.blockchain = new_blockchain
+                    self.blockchain = dreamnail.singleton.blockchain
                     dreamnail.singleton.log(f"### With ({self.address}) finished syncing new chain with mass {dreamnail.Server.singleton.blockchain.mass} and length {len(dreamnail.Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
                 except Exception as err:
                     dreamnail.singleton.log(f"!!! Error {err} while getting blocks from peer in CHNSYN ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
@@ -996,6 +1001,8 @@ class dreamnail:
         except (ValueError, AssertionError):
             if output_address != "MINER" or self.edited_transaction.get_miner_fee() != 0:
                 output_address_valid = False
+            else:
+                output_address_valid = True
 
         try:
             output_value = dreamveil.to_decimal(output_value)
