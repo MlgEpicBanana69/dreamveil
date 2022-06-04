@@ -15,44 +15,52 @@ USER_DATA_TEMPLATE = {"username": None,
                           "outgoing": [],
                           "ingoing": []}
 
+def load_bench_file(filename, loading_func):
+    read_param = "r+" if os.path.isfile(APPLICATION_PATH + f"\\bench\\{filename}") else "w+"
+    with open(APPLICATION_PATH + "\\bench\\filename", read_param) as f:
+        try:
+            contents = f.read()
+            return loading_func(contents, f)
+        except (ValueError, AssertionError) as err:
+            print(f"!!! Could not loads {filename} from bench")
+            print(err)
+            f.close()
+            if os.path.isfile("bench\\filename"):
+                os.rename("bench\\filename", f"bench\\backup\\{filename}-{secrets.token_hex(8)}.old")
+
 def load_bench():
-    bench_dirs = ["..\\bench", "backup", "users"]
+    outputs = []
+    bench_dirs = ["..\\bench", "backup", "users", "POWfailed"]
     for bench_dir in bench_dirs:
         if not os.path.isdir(f"{APPLICATION_PATH}\\bench\\{bench_dir}"):
             os.mkdir(f"{APPLICATION_PATH}\\bench\\{bench_dir}")
 
-    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "\\bench\\blockchain.json") else "w+"
-    with open(APPLICATION_PATH + "\\bench\\blockchain.json", read_param) as f:
-        try:
-            contents = f.read()
-            if contents == "":
-                contents = "[]"
-                f.write(contents)
-            blockchain = dreamveil.Blockchain.loads(contents)
-        except (ValueError, AssertionError) as err:
-            print("!!! Could not loads blockchain from bench")
-            print(f"{type(err): {err.args[1]}}")
+    def loading_func(contents, f):
+        if contents == "":
+            contents = "[]"
+            f.write(contents)
+        return dreamveil.Blockchain.loads(contents)
+    outputs.append(load_bench_file("blockchain.json", loading_func))
 
-            f.close()
-            if os.path.isfile(APPLICATION_PATH + "\\bench\\blockchain.json"):
-                os.rename(APPLICATION_PATH + "\\bench\\blockchain.json", APPLICATION_PATH + f"\\bench\\backup\\blockchain-{secrets.token_hex(8)}.json.old")
+    def loading_func(contents, f):
+        if contents == "":
+            contents = "{}"
+            f.write(contents)
+        peer_pool = json.loads(contents)
+        assert type(peer_pool) == dict
+        return peer_pool
+    outputs.append(load_bench_file("peer_pool.json", loading_func))
 
-    read_param = "r+" if os.path.isfile(APPLICATION_PATH + "\\bench\\peer_pool.json") else "w+"
-    with open(APPLICATION_PATH + "\\bench\\peer_pool.json", read_param) as f:
-        try:
-            contents = f.read()
-            if contents == "":
-                contents = "{}"
-                f.write(contents)
-            peer_pool = json.loads(contents)
-            assert type(peer_pool) == dict
-        except (ValueError, AssertionError) as err:
-            print("!!! Could not loads peer pool from bench")
-            print(err)
-            f.close()
-            if os.path.isfile("bench\\peer_pool.json"):
-                os.rename("bench\\peer_pool.json", f"bench\\backup\\peer_pool-{secrets.token_hex(8)}.json.old")
-    return blockchain, peer_pool
+    def loading_func(contents, f):
+        if contents == "":
+            contents = "[]"
+            f.write(contents)
+        tracked = json.loads(contents)
+        assert type(tracked) == list
+        return tracked
+    outputs.append(load_bench_file("tracked.json", loading_func))
+
+    return outputs
 
 def write_blockchain_file(blockchain:dreamveil.Blockchain):
     with open(APPLICATION_PATH + f"\\bench\\blockchain.json", "w") as blockchain_file:

@@ -64,6 +64,8 @@ class dreamnail:
             self.port = port
             self.max_peer_amount = max_peer_amount
             self.user_key = dreamnail.singleton.user_data["key"]
+            self.outgoing = dreamnail.singleton.user_data["outgoing"]
+            self.ingoing = dreamnail.singleton.user_data["ingoing"]
             self.version = dreamnail.singleton.VERSION
             self.blockchain = dreamnail.singleton.blockchain
             self.peer_pool = dreamnail.singleton.peer_pool
@@ -715,7 +717,7 @@ class dreamnail:
         self.transaction_pool = []
 
         dreamnail.singleton.log("Loading bench from saved files...")
-        self.blockchain, self.peer_pool = dreambench.load_bench()
+        self.blockchain, self.peer_pool, self.tracked = dreambench.load_bench()
         for peer_address in self.peer_pool.keys():
             self.add_to_peer_pool_gui(peer_address)
         dreamnail.singleton.log("Finished loading bench")
