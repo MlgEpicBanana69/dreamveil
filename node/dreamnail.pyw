@@ -523,6 +523,7 @@ class dreamnail:
                         self.send("continue")
 
                     # We swap the blockchain objects to the new larger one.
+                    new_blockchain.tracked = dreamnail.Server.singleton.blockchain.tracked
                     dreamnail.Server.singleton.blockchain = new_blockchain
                     dreamnail.singleton.log(f"### With ({self.address}) finished syncing new chain with mass {dreamnail.Server.singleton.blockchain.mass} and length {len(dreamnail.Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
                 except Exception as err:
