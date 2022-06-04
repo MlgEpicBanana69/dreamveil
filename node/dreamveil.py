@@ -1,11 +1,9 @@
-import threading
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
 import base64
 import secrets
 import decimal
-import math
 import json
 
 import data_structures
@@ -64,11 +62,10 @@ class Transaction:
     def sign(self, private_key:RSA.RsaKey):
         """Signs the transaction object after generating a random Nonce
            :param private_key: The private key related to the sender's wallet
-           :returns: The produced digital signature"""
+           :returns: self"""
         # Generate and set a random Nonce
         self.nonce = secrets.token_hex(32)
         # Generate the transaction hash (Including the nonce)
-        # TODO: make sure the hash doesn't hash the signature itself ("Bruh")
         transaction_hash = SHA256.new(self.get_contents().encode())
         # Sign the transaction hash using the RSA private key
         digital_signature = pkcs1_15.new(private_key).sign(transaction_hash).hex()
@@ -78,7 +75,6 @@ class Transaction:
 
     def verify_signature(self):
         """Verifies if the digital signature of the transaction is the same as its true computed digital signature"""
-        # TODO DEBUG THIS
         try:
             rsa_public_key = address_to_key(self.sender)
             computed_hash = SHA256.new(self.get_contents().encode())
@@ -92,6 +88,10 @@ class Transaction:
         try:
             if (len(self.inputs) != 0 and len(self.outputs) == 0) or (len(self.inputs) == 0 and len(self.outputs) != 0):
                 return False
+
+            if len(self.inputs) == 1 and len(self.outputs) == 1:
+                if self.sender in self.inputs and self.sender in self.outputs:
+                    return False
 
             has_miner_fee = False
 
@@ -145,9 +145,9 @@ class Transaction:
             assert transaction_object.verify_io()
             assert transaction_object.verify_signature()
             return transaction_object
-        except (Exception) as err:
-            # TODO: Debug this
-            print("Transaction rejected!")
+        except Exception as err:
+            print(f"Transaction rejected due to {type(err)}: {err.args[1]}")
+            return None
 
     def dumps(self):
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
@@ -238,7 +238,6 @@ class Block:
 
     @staticmethod
     def loads(json_str):
-        # TODO: DEBUG THIS
         try:
             assert len(json_str.encode()) <= Block.MAX_SIZE
             information = json.loads(json_str)
@@ -250,7 +249,6 @@ class Block:
             # Read and interpret each transaction object seperately
             assert type(information[1]) == list and len(information[1]) > 0
             transactions = []
-            # TODO: Debug this bs
             for transaction in information[1]:
                 transactions.append(Transaction.loads(transaction))
             assert Block.verify_transactions(transactions)

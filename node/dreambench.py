@@ -11,9 +11,7 @@ APPLICATION_PATH = os.path.dirname(os.path.abspath(__file__))
 
 USER_DATA_TEMPLATE = {"username": None,
                           "key": None,
-                          "balance": 0,
-                          "outgoing": [],
-                          "ingoing": []}
+                          "balance": "0"}
 
 def load_bench_file(filename, loading_func):
     read_param = "r+" if os.path.isfile(APPLICATION_PATH + f"\\bench\\{filename}") else "w+"
@@ -68,6 +66,7 @@ def try_read_user_file(passphrase:str, username:str):
             user_file_contents = dreamshield.decrypt(passphrase, user_file_contents)
             user_data = json.loads(user_file_contents)
             user_data["key"] = RSA.import_key(user_data["key"])
+            user_data["balance"] = dreamveil.to_decimal(user_data["balance"])
             return user_data
         except (ValueError, json.JSONDecodeError):
             return None
@@ -77,6 +76,7 @@ def write_user_file(passphrase:str, user_data:dict):
         try:
             user_file_contents = user_data.copy()
             user_file_contents["key"] = user_file_contents["key"].export_key('PEM').decode()
+            user_file_contents["balance"] = str(user_file_contents["balance"])
             user_file_contents = json.dumps(user_file_contents)
             user_file_contents = dreamshield.encrypt(passphrase, user_file_contents)
             user_file.write(user_file_contents)

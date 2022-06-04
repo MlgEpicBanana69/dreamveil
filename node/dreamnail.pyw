@@ -1,5 +1,4 @@
 import dreamveil
-import dreamshield
 import dreambench
 import dreamui
 
@@ -7,16 +6,14 @@ import configparser
 import ipaddress
 import os
 import sys
-import secrets
 import json
 import random
 import math
 import timeit
-import atexit
 import socket
 import time
+import pyperclip
 
-from Crypto.PublicKey import RSA
 from Crypto.Hash import SHA256
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QApplication, QMainWindow
@@ -64,8 +61,6 @@ class dreamnail:
             self.port = port
             self.max_peer_amount = max_peer_amount
             self.user_key = dreamnail.singleton.user_data["key"]
-            self.outgoing = dreamnail.singleton.user_data["outgoing"]
-            self.ingoing = dreamnail.singleton.user_data["ingoing"]
             self.version = dreamnail.singleton.VERSION
             self.blockchain = dreamnail.singleton.blockchain
             self.peer_pool = dreamnail.singleton.peer_pool
@@ -197,7 +192,6 @@ class dreamnail:
             raise ValueError(f"{signature} is not in list")
 
         def miner(self):
-            # TODO: Properly and fully implement
             dreamnail.singleton.log("Miner started")
             transaction_pool_len = None
             my_chain_len = None
@@ -260,11 +254,18 @@ class dreamnail:
                     if dreamnail.singleton.ui.tabWidget.currentIndex() == 3:
                         dreamnail.singleton.updateBlockchainExplorerTab()
 
-                    block_index = len(self.blockchain.chain)-1
                     for transaction in block.transactions:
                         if "BLOCK" not in transaction.inputs:
                             if transaction in self.transaction_pool:
                                 self.transaction_pool.remove(transaction)
+
+                    user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
+                    if user_address in self.blockchain.tracked:
+                        new_balance = dreamveil.to_decimal(0)
+                        for relevant_transaction_block_index in self.blockchain.tracked[user_address]:
+                            for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
+                                new_balance += transaction.calculate_transaction_gain(user_address)
+                        dreamnail.singleton.user_data["balance"] = new_balance
 
                     current_peer_addresses = list(self.peers.keys())
                     for peer_addr in current_peer_addresses:
@@ -657,7 +658,6 @@ class dreamnail:
         if dreamnail.singleton is not None:
             raise Exception("Singleton object limited to one instance.")
         dreamnail.singleton = self
-        atexit.register(self.exit_handler)
         QtCore.QDir.addSearchPath("resources", APPLICATION_PATH + "/resources/")
 
         self.app = QApplication(sys.argv)
@@ -669,6 +669,7 @@ class dreamnail:
         self.ui.tabWidget.currentChanged.connect(self.tabWidget_currentChanged)
         self.ui.loginButton.clicked.connect(self.loginButton_clicked)
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
+        self.ui.walletAddressCopyButton.clicked.connect(self.walletAddressCopyButton_clicked)
         self.ui.serverStateButton.clicked.connect(self.serverStateButton_clicked)
         self.ui.registerButton.clicked.connect(self.registerButton_clicked)
         self.ui.usernameLineEdit.textChanged.connect(self.usernameLineEdit_textChanged)
@@ -683,6 +684,13 @@ class dreamnail:
         self.ui.Block2TransactionCombobox.currentTextChanged.connect(self.Block2TransactionCombobox_currentTextChanged)
         self.ui.Block3TransactionCombobox.currentTextChanged.connect(self.Block3TransactionCombobox_currentTextChanged)
         self.ui.Block4TransactionCombobox.currentTextChanged.connect(self.Block4TransactionCombobox_currentTextChanged)
+        self.ui.TransactionAddOutputButton.clicked.connect(self.TransactionAddOutputbutton_clicked)
+        self.ui.TransactionRemoveOutputButton.clicked.connect(self.TransactionRemoveOutputButton_clicked)
+        self.ui.TransactionEditAddressLineEdit.textChanged.connect(self.TransactionEditorLineEdit_textChanged)
+        self.ui.TransactionEditValueLineEdit.textChanged.connect(self.TransactionEditorLineEdit_textChanged)
+        self.ui.TransactionOutputSelectCombobox.currentTextChanged.connect(self.TransactionOutputSelectCombobox_textChanged)
+        self.ui.transactionMsgTextEdit.textChanged.connect(self.TransactionMsgTextEdit_textChanged)
+        self.ui.createTransactionButton.clicked.connect(self.createTransactionButton_clicked)
 
         self.ui.userLabel.setStyleSheet("QLabel { color: white; }")
         self.ui.balanceLabel.setStyleSheet("QLabel { color: white; }")
@@ -710,6 +718,7 @@ class dreamnail:
 
         self.user_data = dreambench.USER_DATA_TEMPLATE.copy()
         self.miner_msg = ""
+        self.edited_transaction = None
 
         self.server = None
 
@@ -768,6 +777,10 @@ class dreamnail:
         self.user_data = dreambench.USER_DATA_TEMPLATE.copy()
         self.ui.userLabel.setText(self.user_data["username"])
         self.ui.balanceLabel.setText(str(self.user_data["balance"]))
+        self.ui.userWalletAddressLineEdit.setText("")
+
+    def walletAddressCopyButton_clicked(self):
+        pyperclip.copy(self.ui.userWalletAddressLineEdit.text())
 
     def usernameLineEdit_textChanged(self):
         if self.ui.usernameLineEdit.text().isalnum() and len(self.ui.passwordLineEdit.text()) > 0:
@@ -921,6 +934,61 @@ class dreamnail:
                 for output_source, output_value in transaction.outputs.items():
                     self.ui.Block4TransactionOutputCombobox.addItem(f"{output_value} - {output_source}")
                 self.ui.block4TextBrowser.setText(transaction.message)
+
+    def createTransactionButton_clicked(self):
+        try:
+            pass
+
+            self.ui.TransactionOutputSelectCombobox.clear()
+            self.ui.TransactionEditAddressLineEdit.setText("")
+            self.ui.TransactionEditValueLineEdit.setText("")
+        except:
+            pass
+            raise
+
+    def TransactionOutputSelectCombobox_textChanged(self):
+        self.ui.TransactionRemoveOutputButton.setEnabled(self.ui.TransactionOutputSelectCombobox.currentText() != "")
+
+        self.edited_transaction.sign()
+        verify = dreamveil.Transaction.loads(self.edited_transaction.dumps()) is not None
+        self.ui.createTransactionButton.setEnabled(verify)
+
+    def TransactionEditorLineEdit_textChanged(self):
+        output_address = self.ui.TransactionEditAddressLineEdit.text()
+        output_value = self.ui.TransactionEditValueLineEdit.text()
+        try:
+            dreamveil.address_to_key(output_address)
+            assert output_address not in self.edited_transaction.outputs()
+            output_address_valid = True
+        except:
+            output_address_valid = False
+
+        try:
+            output_value = dreamveil.to_decimal(output_value)
+            assert output_value > 0
+            output_value_valid = True
+        except:
+            output_value_valid = False
+
+        self.ui.TransactionAddOutputButton.setEnabled(output_address_valid and output_value_valid)
+
+    def TransactionAddOutputbutton_clicked(self):
+        self.ui.createTransactionButton.setEnabled(False)
+        output_address = self.ui.TransactionEditAddressLineEdit.text()
+        output_value = self.ui.TransactionEditValueLineEdit.text()
+        self.edited_transaction.inputs[output_address] = output_value
+        self.ui.TransactionOutputSelectCombobox.addItem(f"{output_value} - {output_address}")
+        self.ui.TransactionEditAddressLineEdit.setText("")
+        self.ui.TransactionEditValueLineEdit.setText("")
+
+    def TransactionRemoveOutputButton_clicked(self):
+        self.ui.createTransactionButton.setEnabled(False)
+        del self.edited_transaction.outputs[self.ui.TransactionOutputSelectCombobox.currentIndex()]
+        self.ui.TransactionOutputSelectCombobox.removeItem(self.ui.TransactionOutputSelectCombobox.currentIndex())
+
+    def TransactionMsgTextEdit_textChanged(self):
+        if self.edited_transaction is not None:
+            self.edited_transaction.message = self.ui.transactionMsgTextEdit.toPlainText()
     #endregion
 
     #region Tab updates
@@ -982,16 +1050,19 @@ class dreamnail:
                     for transaction in current_block.transactions:
                         self.ui.Block4TransactionCombobox.addItem(transaction.signature)
 
-    def updateUserTab(self, headstart=0):
+    def updateUserTab(self):
         if self.user_data != dreambench.USER_DATA_TEMPLATE:
-            user_address = dreamveil.key_to_address(self.user_data["key"])
-            if user_address in self.blockchain.tracked:
-                new_balance = dreamveil.to_decimal(self.ui.balanceLabel.text())
-                for relevant_transaction_block_index in self.blockchain.tracked[user_address][headstart::]:
-                    for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
-                        new_balance += transaction.calculate_transaction_gain(user_address)
-                self.ui.balanceLabel.setText(str(new_balance))
+            self.ui.balanceLabel.setText(str(self.user_data["balance"]))
+            self.ui.userWalletAddressLineEdit.setText(dreamveil.key_to_address(self.user_data["key"]))
 
+    def updateTransactionEditorTab(self):
+        if self.user_data != dreambench.USER_DATA_TEMPLATE:
+            self.edited_transaction = self.edited_transaction = dreamveil.Transaction(dreamveil.key_to_address(self.user_data["key"]), {}, {}, "", "", "")
+            self.ui.TransactionEditAddressLineEdit.setText("")
+            self.ui.TransactionEditValueLineEdit.setText("")
+            self.ui.transactionMsgTextEdit.setPlainText("")
+            self.ui.TransactionOutputSelectCombobox.clear()
+            self.ui.createTransactionButton.setEnabled(False)
     #endregion
 
     def open_server(self):
@@ -1028,7 +1099,7 @@ class dreamnail:
         dreambench.write_peer_pool_file(self.peer_pool)
         if self.user_data != dreambench.USER_DATA_TEMPLATE and self.user_passphrase is not None:
             dreambench.write_user_file(self.user_passphrase, self.user_data)
-        self.log("Exit sus")
+        self.log("Application Exit")
 
 if __name__ == '__main__':
     application = dreamnail()

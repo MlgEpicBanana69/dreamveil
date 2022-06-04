@@ -193,7 +193,6 @@ class multifurcasting_tree:
 
     def insert(self, val, prev_val, root=None):
         # CONTINUE FROM HERE
-        # TODO: ADD A TRACE/SEARCH FUNCTION
         if self.tree is None:
             self.tree = multifurcasting_node(val)
             return
