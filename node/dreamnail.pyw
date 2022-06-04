@@ -176,7 +176,7 @@ class dreamnail:
             """Terminated the server and all of its ongoing connections"""
             dreamnail.singleton.log("### SHUTTING DOWN SERVER")
             self.socket.close()
-            for conn in self.peers.values():
+            for conn in list(self.peers.values()):
                 conn.close()
 
             self.closed = True
