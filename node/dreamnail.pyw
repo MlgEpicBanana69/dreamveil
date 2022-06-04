@@ -994,7 +994,8 @@ class dreamnail:
             assert output_address != dreamveil.key_to_address(self.user_data["key"])
             output_address_valid = True
         except (ValueError, AssertionError):
-            output_address_valid = False
+            if output_address != "MINER" or self.edited_transaction.get_miner_fee() != 0:
+                output_address_valid = False
 
         try:
             output_value = dreamveil.to_decimal(output_value)
