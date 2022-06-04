@@ -188,10 +188,10 @@ class dreamnail:
             self.transaction_pool.append(transaction)
             self.transaction_pool.sort(key=dreamveil.Transaction.calculate_efficiency)
 
-            current_peer_addresses = list(self.server.peers.keys())
+            current_peer_addresses = list(self.peers.keys())
             for peer_addr in current_peer_addresses:
                 if peer_addr not in exclusions:
-                    action_thread = threading.Thread(target=self.server.peers[peer_addr].SENDTX, args=(self.edited_transaction,))
+                    action_thread = threading.Thread(target=self.peers[peer_addr].SENDTX, args=(dreamnail.singleton.edited_transaction,))
                     action_thread.start()
 
         def find_in_transaction_pool(self, signature:str):
