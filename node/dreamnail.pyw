@@ -13,6 +13,7 @@ import timeit
 import socket
 import time
 import pyperclip
+import decimal
 
 from Crypto.Hash import SHA256
 from PyQt6 import QtWidgets, QtCore, QtGui
@@ -262,7 +263,7 @@ class dreamnail:
                     user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
                     if user_address in self.blockchain.tracked:
                         new_balance = dreamveil.to_decimal(0)
-                        for relevant_transaction_block_index in self.blockchain.tracked[user_address]:
+                        for relevant_transaction_block_index, tx_sign in self.blockchain.tracked[user_address]:
                             for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
                                 new_balance += transaction.calculate_transaction_gain(user_address)
                         dreamnail.singleton.user_data["balance"] = new_balance
@@ -688,7 +689,7 @@ class dreamnail:
         self.ui.TransactionRemoveOutputButton.clicked.connect(self.TransactionRemoveOutputButton_clicked)
         self.ui.TransactionEditAddressLineEdit.textChanged.connect(self.TransactionEditorLineEdit_textChanged)
         self.ui.TransactionEditValueLineEdit.textChanged.connect(self.TransactionEditorLineEdit_textChanged)
-        self.ui.TransactionOutputSelectCombobox.currentTextChanged.connect(self.TransactionOutputSelectCombobox_textChanged)
+        self.ui.TransactionOutputSelectCombobox.currentTextChanged.connect(self.TransactionOutputSelectCombobox_currentTextChanged)
         self.ui.transactionMsgTextEdit.textChanged.connect(self.TransactionMsgTextEdit_textChanged)
         self.ui.createTransactionButton.clicked.connect(self.createTransactionButton_clicked)
 
@@ -741,6 +742,8 @@ class dreamnail:
                 self.updateBlockchainExplorerTab()
             case 2:
                 self.updateUserTab()
+            case 6:
+                self.updateTransactionEditorTab()
 
     def loginButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
@@ -936,38 +939,62 @@ class dreamnail:
                 self.ui.block4TextBrowser.setText(transaction.message)
 
     def createTransactionButton_clicked(self):
-        try:
-            pass
+        user_address = dreamveil.key_to_address(self.user_data["key"])
+        if user_address in self.blockchain.tracked:
+            output_sum = sum([dreamveil.to_decimal(val) for val in self.edited_transaction.outputs.values()])
+            funds_sum = decimal.Decimal(0)
+            input_transactions = {}
+            for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
+                for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
+                    if transaction.signature not in self.edited_transaction.inputs and transaction.signature == transaction_signature:
+                        transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
+                        if transaction_value is not None:
+                            funds_sum += dreamveil.to_decimal(transaction_value)
+                            input_transactions[transaction.signature] = transaction_value
+                        if transaction_value is None or funds_sum >= output_sum:
+                            break
+                if transaction_value is None or funds_sum >= output_sum:
+                    break
+            if funds_sum >= output_sum:
+                for signature, value in input_transactions.items():
+                    self.edited_transaction.inputs[signature] = value
+                diffrential_tx_value = funds_sum - output_sum
+                if diffrential_tx_value > 0:
+                    self.edited_transaction.outputs[user_address] = str(diffrential_tx_value)
+            self.edited_transaction.sign(self.user_data["key"])
+            verify = dreamveil.Transaction.loads(self.edited_transaction.dumps())
+            verify = verify is not None
+            if verify:
+                current_peer_addresses = list(self.server.peers.keys())
+                for peer_addr in current_peer_addresses:
+                    action_thread = threading.Thread(target=self.server.peers[peer_addr].SENDTX, args=(self.edited_transaction,))
+                    action_thread.start()
 
-            self.ui.TransactionOutputSelectCombobox.clear()
-            self.ui.TransactionEditAddressLineEdit.setText("")
-            self.ui.TransactionEditValueLineEdit.setText("")
-        except:
-            pass
-            raise
+                QtWidgets.QMessageBox.information(self.win, "Transaction issued", "Succesfuly created and broadcasted transaction to all connected peers.")
+                self.updateTransactionEditorTab()
+                return
+        QtWidgets.QMessageBox.critical(self.win, "Failed to issue transaction", "Insufficient funds.")
 
-    def TransactionOutputSelectCombobox_textChanged(self):
+    def TransactionOutputSelectCombobox_currentTextChanged(self):
         self.ui.TransactionRemoveOutputButton.setEnabled(self.ui.TransactionOutputSelectCombobox.currentText() != "")
-
-        self.edited_transaction.sign()
-        verify = dreamveil.Transaction.loads(self.edited_transaction.dumps()) is not None
-        self.ui.createTransactionButton.setEnabled(verify)
+        self.ui.createTransactionButton.setEnabled(self.ui.TransactionOutputSelectCombobox.currentText() != "")
 
     def TransactionEditorLineEdit_textChanged(self):
         output_address = self.ui.TransactionEditAddressLineEdit.text()
         output_value = self.ui.TransactionEditValueLineEdit.text()
         try:
             dreamveil.address_to_key(output_address)
-            assert output_address not in self.edited_transaction.outputs()
+            assert output_address not in self.edited_transaction.outputs
+            assert output_address != dreamveil.key_to_address(self.user_data["key"])
             output_address_valid = True
-        except:
+        except (ValueError, AssertionError):
             output_address_valid = False
 
         try:
             output_value = dreamveil.to_decimal(output_value)
             assert output_value > 0
             output_value_valid = True
-        except:
+        except (decimal.InvalidOperation, AssertionError):
             output_value_valid = False
 
         self.ui.TransactionAddOutputButton.setEnabled(output_address_valid and output_value_valid)
@@ -976,14 +1003,16 @@ class dreamnail:
         self.ui.createTransactionButton.setEnabled(False)
         output_address = self.ui.TransactionEditAddressLineEdit.text()
         output_value = self.ui.TransactionEditValueLineEdit.text()
-        self.edited_transaction.inputs[output_address] = output_value
+
+        self.edited_transaction.outputs[output_address] = output_value
         self.ui.TransactionOutputSelectCombobox.addItem(f"{output_value} - {output_address}")
         self.ui.TransactionEditAddressLineEdit.setText("")
         self.ui.TransactionEditValueLineEdit.setText("")
 
     def TransactionRemoveOutputButton_clicked(self):
         self.ui.createTransactionButton.setEnabled(False)
-        del self.edited_transaction.outputs[self.ui.TransactionOutputSelectCombobox.currentIndex()]
+        output_address = self.ui.TransactionOutputSelectCombobox.currentText().split(" - ")[-1]
+        del self.edited_transaction.outputs[output_address]
         self.ui.TransactionOutputSelectCombobox.removeItem(self.ui.TransactionOutputSelectCombobox.currentIndex())
 
     def TransactionMsgTextEdit_textChanged(self):
@@ -1057,12 +1086,12 @@ class dreamnail:
 
     def updateTransactionEditorTab(self):
         if self.user_data != dreambench.USER_DATA_TEMPLATE:
-            self.edited_transaction = self.edited_transaction = dreamveil.Transaction(dreamveil.key_to_address(self.user_data["key"]), {}, {}, "", "", "")
-            self.ui.TransactionEditAddressLineEdit.setText("")
-            self.ui.TransactionEditValueLineEdit.setText("")
-            self.ui.transactionMsgTextEdit.setPlainText("")
-            self.ui.TransactionOutputSelectCombobox.clear()
-            self.ui.createTransactionButton.setEnabled(False)
+            self.edited_transaction = dreamveil.Transaction(dreamveil.key_to_address(self.user_data["key"]), {}, {}, "", "", "")
+        self.ui.TransactionEditAddressLineEdit.setText("")
+        self.ui.TransactionEditValueLineEdit.setText("")
+        self.ui.transactionMsgTextEdit.setPlainText("")
+        self.ui.TransactionOutputSelectCombobox.clear()
+        self.ui.createTransactionButton.setEnabled(False)
     #endregion
 
     def open_server(self):

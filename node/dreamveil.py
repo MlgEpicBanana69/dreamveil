@@ -54,7 +54,6 @@ class Transaction:
         self.message = message
         self.nonce = nonce
         self.signature = signature
-        assert self.verify_io()
 
     def __repr__(self):
         return self.dumps()
@@ -86,6 +85,9 @@ class Transaction:
     def verify_io(self):
         """Checks that IO is both in correct format and maintain currency equality"""
         try:
+            if len(self.inputs) == 0 and len(self.inputs) == 0:
+                return False
+
             if (len(self.inputs) != 0 and len(self.outputs) == 0) or (len(self.inputs) == 0 and len(self.outputs) != 0):
                 return False
 
@@ -93,14 +95,12 @@ class Transaction:
                 if self.sender in self.inputs and self.sender in self.outputs:
                     return False
 
-            has_miner_fee = False
-
             inputs_sum = 0
             for input_key, input_value in self.inputs.items():
                 if type(input_key) != str or type(input_value) != str:
                     return False
                 input_value = to_decimal(input_value)
-                if len(input_key) != 600:
+                if len(input_key) != 512:
                     if not (len(self.inputs) == 1 and list(self.inputs.keys())[0] == "BLOCK"):
                         return False
                 if input_value < 0:
@@ -113,10 +113,7 @@ class Transaction:
                     return False
                 output_value = to_decimal(output_value)
                 if len(output_key) != 600:
-                    if not has_miner_fee and output_key == "MINER":
-                        has_miner_fee = True
-                    else:
-                        return False
+                    return False
                 if input_value < 0:
                     return False
                 outputs_sum += output_value
@@ -146,7 +143,7 @@ class Transaction:
             assert transaction_object.verify_signature()
             return transaction_object
         except Exception as err:
-            print(f"Transaction rejected due to {type(err)}: {err.args[1]}")
+            # print(f"Transaction rejected due to {type(err)}: {err.args}")
             return None
 
     def dumps(self):
@@ -337,7 +334,7 @@ class Blockchain:
 
     GENESIS_MESSAGE = r"""Dreamveil - The coolest blockchain, 12th grade cyber project."""
 
-    # Unspent_transaction_tree
+    # unspent_transactions_tree
     # Transaction signature: (spent, value)
     def __init__(self, chain:list=None, mass:int=0, unspent_transactions_tree:data_structures.AVL=None, tracked:dict=None):
         if chain is None:
@@ -388,7 +385,7 @@ class Blockchain:
             # Track the transaction for each of the tracked addresss
             for tracked_address in self.tracked.keys():
                 if tracked_address in transaction.inputs or tracked_address in transaction.outputs:
-                    self.tracked[tracked_address].append(new_block_index)
+                    self.tracked[tracked_address].append((new_block_index, transaction.signature))
         return True
 
     def verify_block(self, block:Block, block_height:int):
@@ -467,3 +464,15 @@ class Blockchain:
         n = height // Blockchain.BLOCK_REWARD_SEASON
         block_reward = Blockchain.BLOCK_INITIAL_REWARD * q**n
         return to_decimal(block_reward)
+
+    def calculate_transaction_value(self, transaction, address):
+        """
+        Returns the amount of funds a transaction has for a given wallet address.
+        :returns: None if the transaction does not exist or is spent;
+                  decimal.Decimal Transaction value.
+        """
+        transaction_node = self.unspent_transactions_tree.find(transaction.signature)
+        if transaction_node is not None:
+            if address in transaction_node.value:
+                return transaction_node.value[address]
+        return None
