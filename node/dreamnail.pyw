@@ -182,9 +182,17 @@ class dreamnail:
             self.closed = True
             dreamnail.Server.singleton = None
 
-        def add_to_transaction_pool(self, transaction:dreamveil.Transaction):
+        def add_to_transaction_pool(self, transaction:dreamveil.Transaction, exclusions:list=None):
+            if exclusions is None:
+                exclusions = []
             self.transaction_pool.append(transaction)
             self.transaction_pool.sort(key=dreamveil.Transaction.calculate_efficiency)
+
+            current_peer_addresses = list(self.server.peers.keys())
+            for peer_addr in current_peer_addresses:
+                if peer_addr not in exclusions:
+                    action_thread = threading.Thread(target=self.server.peers[peer_addr].SENDTX, args=(self.edited_transaction,))
+                    action_thread.start()
 
         def find_in_transaction_pool(self, signature:str):
             for tr in self.transaction_pool:
@@ -549,11 +557,7 @@ class dreamnail:
                             self.send("True")
                             new_tx = dreamveil.Transaction.loads(self.read_last_message())
                             if new_tx.signature == tx_signature and "BLOCK" not in new_tx.inputs:
-                                dreamnail.Server.singleton.add_to_transaction_pool(new_tx)
-                                for peer_addr, peer_connection in dreamnail.Server.singleton.peers.items():
-                                    if peer_addr != self.address:
-                                        action_thread = threading.Thread(target=peer_connection.SENDTX, args=(new_tx,))
-                                        action_thread.start()
+                                dreamnail.Server.singleton.add_to_transaction_pool(new_tx, [self.address])
                             else:
                                 self.close()
                     case "SENDBK":
@@ -965,10 +969,7 @@ class dreamnail:
             verify = dreamveil.Transaction.loads(self.edited_transaction.dumps())
             verify = verify is not None
             if verify:
-                current_peer_addresses = list(self.server.peers.keys())
-                for peer_addr in current_peer_addresses:
-                    action_thread = threading.Thread(target=self.server.peers[peer_addr].SENDTX, args=(self.edited_transaction,))
-                    action_thread.start()
+                self.server.add_to_transaction_pool(self.edited_transaction)
 
                 QtWidgets.QMessageBox.information(self.win, "Transaction issued", "Succesfuly created and broadcasted transaction to all connected peers.")
                 self.updateTransactionEditorTab()
