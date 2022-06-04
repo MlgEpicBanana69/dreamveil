@@ -216,17 +216,18 @@ class dreamnail:
                         top_bk_hash = self.blockchain.chain[-1].block_hash if len(self.blockchain.chain) > 0 else ""
                         mined_block = dreamveil.Block(top_bk_hash, [], "", "")
                         block_reward = self.blockchain.calculate_block_reward(len(self.blockchain.chain))
+                        curr_miner_msg = dreamnail.singleton.miner_msg if len(self.blockchain.chain) > 0 else dreamveil.Blockchain.GENESIS_MESSAGE
+                        miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, curr_miner_msg, "", "").sign(self.user_key)
+                        mined_block.add_transaction(miner_reward_transaction)
                         for pool_transaction in self.transaction_pool:
                             try:
                                 block_reward += pool_transaction.get_miner_fee()
                                 mined_block.add_transaction(pool_transaction)
-                                if not dreamveil.Block.verify_transactions(mined_block.transactions) or self.blockchain.verify_block(mined_block, len(self.blockchain.chain)):
+                                if not dreamveil.Block.verify_transactions(mined_block.transactions) or not self.blockchain.verify_block(mined_block, len(self.blockchain.chain)):
                                     mined_block.remove_transaction(pool_transaction)
                             except ValueError:
                                 break
-                        curr_miner_msg = dreamnail.singleton.miner_msg if len(self.blockchain.chain) > 0 else dreamveil.Blockchain.GENESIS_MESSAGE
-                        miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, curr_miner_msg, "", "").sign(self.user_key)
-                        mined_block.add_transaction(miner_reward_transaction)
+
 
                     if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
                         if self.try_chain_block(mined_block):
@@ -959,9 +960,9 @@ class dreamnail:
                         if transaction_value is not None:
                             funds_sum += dreamveil.to_decimal(transaction_value)
                             input_transactions[transaction.signature] = transaction_value
-                        if transaction_value is None or funds_sum >= output_sum:
+                        if funds_sum >= output_sum:
                             break
-                if transaction_value is None or funds_sum >= output_sum:
+                if funds_sum >= output_sum:
                     break
             if funds_sum >= output_sum:
                 for signature, value in input_transactions.items():

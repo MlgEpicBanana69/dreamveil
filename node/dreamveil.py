@@ -95,6 +95,8 @@ class Transaction:
                 if self.sender in self.inputs and self.sender in self.outputs:
                     return False
 
+            has_miner_fee = False
+
             inputs_sum = 0
             for input_key, input_value in self.inputs.items():
                 if type(input_key) != str or type(input_value) != str:
@@ -113,7 +115,10 @@ class Transaction:
                     return False
                 output_value = to_decimal(output_value)
                 if len(output_key) != 600:
-                    return False
+                    if has_miner_fee or output_key != "MINER":
+                        return False
+                    else:
+                        has_miner_fee = True
                 if input_value < 0:
                     return False
                 outputs_sum += output_value
@@ -266,7 +271,6 @@ class Block:
     def dumps(self):
         transactions_json_object = [tx.dumps() for tx in self.transactions]
         information = [self.previous_block_hash, transactions_json_object, self.nonce, self.block_hash]
-        Block.loads(json.dumps(information))
         return json.dumps(information)
 
     def get_contents(self):
