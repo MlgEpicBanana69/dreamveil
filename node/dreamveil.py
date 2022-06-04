@@ -39,7 +39,7 @@ def key_to_address(rsa_key:RSA.RsaKey):
     Converts an rsa key to address
     :returns: str address
     """
-    return base64.b64encode(rsa_key.export_key()).decode()
+    return base64.b64encode(rsa_key.public_key().export_key()).decode()
 
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
@@ -169,6 +169,16 @@ class Transaction:
             if output_key == "MINER":
                 return to_decimal(output_value)
         return to_decimal(0)
+
+    def calculate_transaction_gain(self, address):
+        output = to_decimal(0)
+        for input_address, input_value in self.inputs.items():
+            if input_address == address:
+                output -= to_decimal(input_value)
+        for output_address, output_value in self.outputs.items():
+            if output_address == address:
+                output += to_decimal(output_value)
+        return output
 
 class Block:
     MAX_SIZE = 2097152 # Maximum block size in bytes (2MB)
@@ -331,9 +341,12 @@ class Blockchain:
 
     # Unspent_transaction_tree
     # Transaction signature: (spent, value)
-    def __init__(self, chain:list=None, mass:int=0, unspent_transactions_tree:data_structures.AVL=None):
+    def __init__(self, chain:list=None, mass:int=0, unspent_transactions_tree:data_structures.AVL=None, tracked:dict=None):
         if chain is None:
             chain = []
+        if tracked is None:
+            tracked = dict()
+        self.tracked = tracked
         self.chain = chain
         self.mass = mass
         self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
@@ -354,12 +367,13 @@ class Blockchain:
             return False
 
         # Add the newly accepted block into the blockchain
+        new_block_index = len(self.chain)
         self.chain.append(block)
 
         # Update the mass of the chain
         self.mass += Block.calculate_block_hash_difficulty(block.block_hash)
 
-        # For each now accepted transaction in the newly trusted block
+        # For each now accepted transaction in the newly chained block
         for transaction in self.chain[-1].transactions:
             # Mark the new transaction as unspent
             self.unspent_transactions_tree.insert(data_structures.binary_tree_node(transaction.signature, transaction.outputs))
@@ -372,8 +386,11 @@ class Blockchain:
                 if intree_node is not None:
                     # We remove the transaction's output as it was spent
                     del intree_node.value[transaction.sender]
-            self.unspent_transactions_tree
 
+            # Track the transaction for each of the tracked addresss
+            for tracked_address in self.tracked.keys():
+                if tracked_address in transaction.inputs or tracked_address in transaction.outputs:
+                    self.tracked[tracked_address].append(new_block_index)
         return True
 
     def verify_block(self, block:Block, block_height:int):
@@ -413,7 +430,7 @@ class Blockchain:
         return True
 
     def dumps(self):
-        information = [[block.dumps() for block in self.chain], self.mass, self.unspent_transactions_tree.dumps()]
+        information = [[block.dumps() for block in self.chain], self.mass, self.unspent_transactions_tree.dumps(), self.tracked]
         return json.dumps(information)
 
     @staticmethod
@@ -422,12 +439,14 @@ class Blockchain:
             json_obj = json.loads(json_str)
             if json_obj != []:
                 assert type(json_obj) == list
-                assert len(json_obj) == 3
+                assert len(json_obj) == 4
                 assert type(json_obj[0]) == list
                 for i in range(len(json_obj[0])):
                     json_obj[0][i] = Block.loads(json_obj[0][i])
                 assert type(json_obj[1]) == int
                 json_obj[2] = data_structures.AVL.loads(json_obj[2])
+                assert type(json_obj[3]) == dict
+                assert False not in [type(val) == list for val in json_obj[3].values()]
 
             return Blockchain(*json_obj)
         except Exception as err:

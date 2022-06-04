@@ -17,7 +17,7 @@ USER_DATA_TEMPLATE = {"username": None,
 
 def load_bench_file(filename, loading_func):
     read_param = "r+" if os.path.isfile(APPLICATION_PATH + f"\\bench\\{filename}") else "w+"
-    with open(APPLICATION_PATH + "\\bench\\filename", read_param) as f:
+    with open(APPLICATION_PATH + f"\\bench\\{filename}", read_param) as f:
         try:
             contents = f.read()
             return loading_func(contents, f)
@@ -25,8 +25,8 @@ def load_bench_file(filename, loading_func):
             print(f"!!! Could not loads {filename} from bench")
             print(err)
             f.close()
-            if os.path.isfile("bench\\filename"):
-                os.rename("bench\\filename", f"bench\\backup\\{filename}-{secrets.token_hex(8)}.old")
+            if os.path.isfile(f"bench\\{filename}"):
+                os.rename(f"bench\\{filename}", f"bench\\backup\\{filename}-{secrets.token_hex(8)}.old")
 
 def load_bench():
     outputs = []
@@ -50,15 +50,6 @@ def load_bench():
         assert type(peer_pool) == dict
         return peer_pool
     outputs.append(load_bench_file("peer_pool.json", loading_func))
-
-    def loading_func(contents, f):
-        if contents == "":
-            contents = "[]"
-            f.write(contents)
-        tracked = json.loads(contents)
-        assert type(tracked) == list
-        return tracked
-    outputs.append(load_bench_file("tracked.json", loading_func))
 
     return outputs
 

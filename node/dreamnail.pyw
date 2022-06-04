@@ -111,10 +111,7 @@ class dreamnail:
             dreamnail.singleton.log("Server is now running...")
 
             while not self.closed:
-                dreamnail.singleton.log(f"### {len(self.peers)}/{self.max_peer_amount} connected. Current peer pool size: {len(self.peer_pool)} Current blockchain length and mass {len(self.blockchain.chain)} {self.blockchain.mass}")
-                start = timeit.default_timer()
-                while timeit.default_timer() - start < 60.0 and not self.closed:
-                    pass
+                pass
             print("### Server stopped running.")
 
         def seeker(self):
@@ -204,7 +201,7 @@ class dreamnail:
             dreamnail.singleton.log("Miner started")
             transaction_pool_len = None
             my_chain_len = None
-            my_address = dreamveil.key_to_address(self.user_key.public_key())
+            my_address = dreamveil.key_to_address(self.user_key)
             try:
                 while not self.closed and self.miner_open:
                     # Refresh the currently mined block when a new transaction is added to the pool
@@ -262,10 +259,13 @@ class dreamnail:
                     dreamnail.singleton.log(f"### SUCCESFULY CHAINED BLOCK {block.block_hash}")
                     if dreamnail.singleton.ui.tabWidget.currentIndex() == 3:
                         dreamnail.singleton.updateBlockchainExplorerTab()
+
+                    block_index = len(self.blockchain.chain)-1
                     for transaction in block.transactions:
                         if "BLOCK" not in transaction.inputs:
                             if transaction in self.transaction_pool:
                                 self.transaction_pool.remove(transaction)
+
                     current_peer_addresses = list(self.peers.keys())
                     for peer_addr in current_peer_addresses:
                         if peer_addr not in exclusions:
@@ -717,7 +717,7 @@ class dreamnail:
         self.transaction_pool = []
 
         dreamnail.singleton.log("Loading bench from saved files...")
-        self.blockchain, self.peer_pool, self.tracked = dreambench.load_bench()
+        self.blockchain, self.peer_pool = dreambench.load_bench()
         for peer_address in self.peer_pool.keys():
             self.add_to_peer_pool_gui(peer_address)
         dreamnail.singleton.log("Finished loading bench")
@@ -730,6 +730,8 @@ class dreamnail:
         match self.ui.tabWidget.currentIndex():
             case 3:
                 self.updateBlockchainExplorerTab()
+            case 2:
+                self.updateUserTab()
 
     def loginButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
@@ -750,6 +752,7 @@ class dreamnail:
 
                 self.ui.userLabel.setText(self.user_data["username"])
                 self.ui.balanceLabel.setText(str(self.user_data["balance"]))
+                return user_data
             else:
                 QtWidgets.QMessageBox.critical(self.win, "Failed to login", "Invalid password.")
         else:
@@ -809,7 +812,9 @@ class dreamnail:
         self.user_passphrase = passphrase
 
         if dreambench.try_create_user(passphrase, username):
-            self.loginButton_clicked()
+            new_user_data = self.loginButton_clicked()
+            if new_user_data is not None:
+                self.blockchain.tracked[dreamveil.key_to_address(new_user_data["key"])] = []
         else:
             QtWidgets.QMessageBox.critical(self.win, "Failed to register new user", "User already exists!")
 
@@ -976,6 +981,17 @@ class dreamnail:
 
                     for transaction in current_block.transactions:
                         self.ui.Block4TransactionCombobox.addItem(transaction.signature)
+
+    def updateUserTab(self, headstart=0):
+        if self.user_data != dreambench.USER_DATA_TEMPLATE:
+            user_address = dreamveil.key_to_address(self.user_data["key"])
+            if user_address in self.blockchain.tracked:
+                new_balance = dreamveil.to_decimal(self.ui.balanceLabel.text())
+                for relevant_transaction_block_index in self.blockchain.tracked[user_address][headstart::]:
+                    for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
+                        new_balance += transaction.calculate_transaction_gain(user_address)
+                self.ui.balanceLabel.setText(str(new_balance))
+
     #endregion
 
     def open_server(self):
