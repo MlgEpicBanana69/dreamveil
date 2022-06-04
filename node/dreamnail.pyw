@@ -550,7 +550,7 @@ class dreamnail:
                 match command:
                     case "SENDTX":
                         self.send("ACK")
-                        tx_signature = self.read_last_message().split(' ')
+                        tx_signature = self.read_last_message()
                         try:
                             assert dreamnail.Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
                             dreamnail.Server.find_in_transaction_pool(tx_signature)
