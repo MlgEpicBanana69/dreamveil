@@ -249,6 +249,7 @@ class Block:
         information = [self.previous_block_hash, transactions_json_object, self.nonce]
         return json.dumps(information)
 
+    @staticmethod
     def verify_transactions(block_transactions:list):
         try:
             for transaction in block_transactions:

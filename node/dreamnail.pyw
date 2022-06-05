@@ -223,7 +223,7 @@ class dreamnail:
                         for pool_transaction in self.transaction_pool.copy():
                             if pool_transaction.signature not in [tx.signature for tx in mined_block.transactions]:
                                 mined_block.transactions.append(pool_transaction)
-                                if not mined_block.verify_transactions():
+                                if not dreamveil.Block.verify_transactions(mined_block.transactions):
                                     mined_block.transactions = mined_block.transactions[:-1]
                                 elif len(mined_block.dumps()) > dreamveil.Block.MAX_SIZE:
                                     mined_block.transactions = mined_block.transactions[:-2]
