@@ -1002,9 +1002,9 @@ class dreamnail:
                     self.edited_transaction.outputs[user_address] = str(diffrential_tx_value)
             self.edited_transaction.sign(self.user_data["key"])
             verify = dreamveil.Transaction.loads(self.edited_transaction.dumps())
-            verify = verify is not None
-            if verify:
-                self.server.add_to_transaction_pool(self.edited_transaction)
+            if verify is not None:
+                newly_created_transaction = verify
+                self.server.add_to_transaction_pool(newly_created_transaction)
 
                 QtWidgets.QMessageBox.information(self.win, "Transaction issued", "Succesfuly created and broadcasted transaction to all connected peers.")
                 self.updateTransactionEditorTab()
