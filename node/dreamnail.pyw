@@ -201,7 +201,7 @@ class dreamnail:
         def remove_from_transaction_pool(self, signature:str):
             for i, tr in enumerate(self.transaction_pool):
                 if tr.signature == signature:
-                    del self.transaction_pool[i]
+                    self.transaction_pool.pop(i)
                     return True
             return False
 
@@ -378,13 +378,23 @@ class dreamnail:
                     if peer not in dreamnail.Server.singleton.peer_pool and peer != dreamnail.Server.singleton.address:
                         dreamnail.Server.singleton.peer_pool[peer] = dreamnail.Server.PEER_STATUS_UNKNOWN
 
+                if self.first_to_move:
+                    self.completed_setup = True
+                    self.send("SUCCESS")
+                    self.read_last_message()
+                    time.sleep(0.05)
+                else:
+                    self.completed_setup = True
+                    self.read_last_message()
+                    self.send("SUCCESS")
+                    time.sleep(0.05)
+
                 if self.peer_chain_mass > dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
                     dreamnail.singleton.log(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {dreamnail.Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
 
                 dreamnail.singleton.log(f"### Connection with {self.address} completed setup (version: {peer_version})")
-                self.completed_setup = True
                 self.lock.release()
             except (AssertionError, TimeoutError, ValueError) as err:
                 dreamnail.singleton.log(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {type(err)}: {err.args}")
@@ -1041,7 +1051,7 @@ class dreamnail:
     def TransactionRemoveOutputButton_clicked(self):
         self.ui.createTransactionButton.setEnabled(False)
         output_address = self.ui.TransactionOutputSelectCombobox.currentText().split(" - ")[-1]
-        del self.edited_transaction.outputs[output_address]
+        self.edited_transaction.outputs.pop(output_address)
         self.ui.TransactionOutputSelectCombobox.removeItem(self.ui.TransactionOutputSelectCombobox.currentIndex())
 
     def TransactionMsgTextEdit_textChanged(self):
