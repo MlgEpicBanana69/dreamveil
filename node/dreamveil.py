@@ -332,6 +332,8 @@ class Blockchain:
         :returns: Did block chain (boolean)"""
 
         canidate_block = Block.loads(block.dumps())
+        if canidate_block is None:
+            return False
 
         if len(self.chain) > 0:
             # Block does not continue our chain
