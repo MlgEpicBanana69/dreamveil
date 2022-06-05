@@ -153,6 +153,8 @@ class Transaction:
 
     def dumps(self):
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
+        if len(self.outputs) == 0:
+            print("OSUHOW??")
         output = json.dumps(information)
         if type(Transaction.loads(output)) != type(self):
             print("WARNING dumped transaction is invalid!")

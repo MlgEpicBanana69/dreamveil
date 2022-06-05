@@ -323,7 +323,10 @@ class dreamnail:
                 self.closed = False
                 self.peer_chain_mass = None
                 self.completed_setup = False
-                self.first_to_move = dreamnail.Server.singleton.address > address
+                try:
+                    self.first_to_move = dreamnail.Server.singleton.address > address
+                except (AttributeError):
+                    self.close()
 
                 if address not in dreamnail.Server.singleton.peers:
                     dreamnail.Server.singleton.peers[self.address] = self
