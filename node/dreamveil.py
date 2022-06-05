@@ -189,29 +189,6 @@ class Block:
     def __repr__(self):
         return self.dumps()
 
-    def add_transaction(self, transaction:Transaction):
-        """
-        Appends a transaction to the block's transaction list and performs one mining attempt.
-        The block has its nonce and hash refreshed.
-        Fails if the length of the resulting block exceeds MAX_SIZE.
-        :param list transaction: The transaction to append
-        """
-        old_nonce, old_hash = self.block_hash, self.nonce
-        self.transactions.append(transaction)
-        self.mine()
-        if len(self.dumps()) > Block.MAX_SIZE:
-            del self.transactions[-1]
-            self.block_hash, self.nonce = old_hash, old_nonce
-            raise ValueError("Transaction too large to be added to block")
-
-    def remove_transaction(self, transaction:Transaction):
-        """
-        Removes a transaction from the block's transaction list.
-        :param list transaction: The transaction to remove
-        """
-        self.transactions.remove(transaction)
-        self.mine()
-
     def hash_block(self):
         """
         Calculates and sets the hash of the block

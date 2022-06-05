@@ -196,7 +196,14 @@ class dreamnail:
             for tr in self.transaction_pool:
                 if tr.signature == signature:
                     return tr
-            raise ValueError(f"{signature} is not in list")
+            return None
+
+        def remove_from_transaction_pool(self, signature:str):
+            for i, tr in enumerate(self.transaction_pool):
+                if tr.signature == signature:
+                    del self.transaction_pool[i]
+                    return True
+            return False
 
         def miner(self):
             dreamnail.singleton.log("Miner started")
@@ -212,24 +219,24 @@ class dreamnail:
                         my_chain_len = len(self.blockchain.chain)
                         top_bk_hash = self.blockchain.chain[-1].block_hash if len(self.blockchain.chain) > 0 else ""
                         mined_block = dreamveil.Block(top_bk_hash, [], "", "")
-                        block_reward = self.blockchain.calculate_block_reward(len(self.blockchain.chain))
-                        curr_miner_msg = dreamnail.singleton.miner_msg if len(self.blockchain.chain) > 0 else dreamveil.Blockchain.GENESIS_MESSAGE
-                        miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, curr_miner_msg, "", "").sign(self.user_key)
-                        mined_block.add_transaction(miner_reward_transaction)
+
                         for pool_transaction in self.transaction_pool.copy():
-                            try:
-                                block_reward += pool_transaction.get_miner_fee()
-                                mined_block.add_transaction(pool_transaction)
-                                assert dreamveil.Block.loads(mined_block.dumps()) is not None
-                            except AssertionError:
-                                if pool_transaction in mined_block.transactions:
-                                    mined_block.remove_transaction(pool_transaction)
-                            finally:
-                                pool_transaction_node = self.blockchain.unspent_transactions_tree.find(pool_transaction.signature)
-                                if pool_transaction_node is not None:
-                                    self.transaction_pool.remove(pool_transaction)
-                                    if pool_transaction in mined_block.transactions:
-                                        mined_block.remove_transaction(pool_transaction)
+                            if pool_transaction.signature not in [tx.signature for tx in mined_block.transactions]:
+                                mined_block.transactions.append(pool_transaction)
+                                if not mined_block.verify_transactions():
+                                    mined_block.transactions = mined_block.transactions[:-1]
+                                elif len(mined_block.dumps()) > dreamveil.Block.MAX_SIZE:
+                                    mined_block.transactions = mined_block.transactions[:-2]
+                                    break
+
+                        curr_miner_msg = dreamnail.singleton.miner_msg if len(self.blockchain.chain) > 0 else dreamveil.Blockchain.GENESIS_MESSAGE
+                        block_reward = self.blockchain.calculate_block_reward(len(self.blockchain.chain))
+                        for transaction in mined_block.transactions:
+                            block_reward += transaction.get_miner_fee()
+                        miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, curr_miner_msg, "", "").sign(self.user_key)
+                        mined_block.transactions.append(miner_reward_transaction)
+                        mined_block.mine()
+
 
                     if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
                         if self.try_chain_block(mined_block):
@@ -269,8 +276,7 @@ class dreamnail:
 
                     for transaction in block.transactions:
                         if "BLOCK" not in transaction.inputs:
-                            if transaction in self.transaction_pool:
-                                self.transaction_pool.remove(transaction)
+                            self.remove_from_transaction_pool(transaction)
 
                         user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
                         new_balance = decimal.Decimal(0)
@@ -518,22 +524,24 @@ class dreamnail:
                         chain_result = new_blockchain.chain_block(new_bk)
 
                         if chain_result:
-                            for transaction in new_bk.transactions:
-                                if "BLOCK" not in transaction.inputs:
-                                    if transaction in dreamnail.Server.singleton.transaction_pool:
-                                        dreamnail.Server.singleton.transaction_pool.remove(transaction)
+                            self.send("continue")
                         else:
                             dreamnail.singleton.log(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
                             if form_new_chain and not new_blockchain is dreamnail.Server.singleton.blockchain:
                                 del new_blockchain
                             self.close()
                             return
-                        self.send("continue")
 
                     # We swap the blockchain objects to the new larger one.
                     new_blockchain.tracked = dreamnail.Server.singleton.blockchain.tracked.copy()
                     dreamnail.singleton.blockchain = new_blockchain
                     self.blockchain = dreamnail.singleton.blockchain
+
+                    # Remove all of the outdated pool transactions
+                    for block in new_blockchain.chain:
+                        for transaction in block.transactions:
+                            dreamnail.Server.singleton.remove_from_transaction_pool(transaction.signature)
+
                     dreamnail.singleton.log(f"### With ({self.address}) finished syncing new chain with mass {dreamnail.Server.singleton.blockchain.mass} and length {len(dreamnail.Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
                 except Exception as err:
                     dreamnail.singleton.log(f"!!! Error {err} while getting blocks from peer in CHNSYN ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
@@ -561,7 +569,7 @@ class dreamnail:
                         tx_signature = self.read_last_message()
                         try:
                             assert dreamnail.Server.singleton.blockchain.unspent_transactions_tree.find(tx_signature)
-                            dreamnail.Server.find_in_transaction_pool(tx_signature)
+                            assert dreamnail.Server.find_in_transaction_pool(tx_signature)
                             self.send("False")
                         except (ValueError, AssertionError):
                             self.send("True")
