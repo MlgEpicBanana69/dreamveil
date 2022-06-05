@@ -331,23 +331,25 @@ class Blockchain:
         """Chains a block to the blockchain. This function succeeds only if a block is valid.
         :returns: Did block chain (boolean)"""
 
+        canidate_block = Block.loads(block.dumps())
+
         if len(self.chain) > 0:
             # Block does not continue our chain
-            if block.previous_block_hash != self.chain[-1].block_hash:
+            if canidate_block.previous_block_hash != self.chain[-1].block_hash:
                 return False
         else:
-            if block.previous_block_hash != "":
+            if canidate_block.previous_block_hash != "":
                 return False
 
-        if not self.verify_block(block, len(self.chain)):
+        if not self.verify_block(canidate_block, len(self.chain)):
             return False
 
         # Add the newly accepted block into the blockchain
         new_block_index = len(self.chain)
-        self.chain.append(block)
+        self.chain.append(canidate_block)
 
         # Update the mass of the chain
-        self.mass += Block.calculate_block_hash_difficulty(block.block_hash)
+        self.mass += Block.calculate_block_hash_difficulty(canidate_block.block_hash)
 
         # For each now accepted transaction in the newly chained block
         for transaction in self.chain[-1].transactions:
