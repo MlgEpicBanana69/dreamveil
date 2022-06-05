@@ -1,2 +1,2 @@
 @echo off
-pip3.10 install json pyperclip decimal configparser ipaddress timeit pycryptodome pyqt6 
+pip3.10 install pyperclip configparser ipaddress pycryptodome pyqt6
