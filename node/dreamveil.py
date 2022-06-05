@@ -356,7 +356,7 @@ class Blockchain:
         # For each now accepted transaction in the newly chained block
         for transaction in self.chain[-1].transactions:
             # Mark the new transaction as unspent
-            self.unspent_transactions_tree.insert(data_structures.binary_tree_node(transaction.signature, transaction.outputs))
+            self.unspent_transactions_tree.insert(data_structures.binary_tree_node(transaction.signature, transaction.outputs.copy()))
 
             # For each input the new transaction referenced
             for heavenly_principle_struck_transaction in transaction.inputs: # All is lost to time (and use) (?)
@@ -365,7 +365,7 @@ class Blockchain:
 
                 if intree_node is not None:
                     # We remove the transaction's output as it was spent
-                    del intree_node.value[transaction.sender]
+                    intree_node.value.pop(transaction.sender)
 
             # Track the transaction for each of the tracked addresss
             for tracked_address in self.tracked.keys():
