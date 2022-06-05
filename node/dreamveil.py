@@ -153,7 +153,9 @@ class Transaction:
 
     def dumps(self):
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
-        return json.dumps(information)
+        output = json.dumps(information)
+        assert type(Transaction.loads(output)) == type(self)
+        return output
 
     def get_contents(self):
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce]
@@ -208,6 +210,7 @@ class Block:
         :param list transaction: The transaction to remove
         """
         self.transactions.remove(transaction)
+        self.mine()
 
     def hash_block(self):
         """
@@ -256,12 +259,14 @@ class Block:
             return output
         except Exception as err:
             print("Block rejected!")
-            raise err
+            raise AssertionError("Block rejected.")
 
     def dumps(self):
         transactions_json_object = [tx.dumps() for tx in self.transactions]
         information = [self.previous_block_hash, transactions_json_object, self.nonce, self.block_hash]
-        return json.dumps(information)
+        output = json.dumps(information)
+        assert type(Block.loads(output)) == type(self)
+        return output
 
     def get_contents(self):
         transactions_json_object = [tx.dumps() for tx in self.transactions]

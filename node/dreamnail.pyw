@@ -107,10 +107,6 @@ class dreamnail:
 
             dreamnail.singleton.log("Server is now running...")
 
-            while not self.closed:
-                pass
-            print("### Server stopped running.")
-
         def seeker(self):
             time.sleep(5)
             dreamnail.singleton.log(f"Server is now seeking new connections")
@@ -188,6 +184,7 @@ class dreamnail:
                 exclusions = []
             self.transaction_pool.append(transaction)
             self.transaction_pool.sort(key=dreamveil.Transaction.calculate_efficiency)
+            self.transaction_pool.reverse()
 
             current_peer_addresses = list(self.peers.keys())
             for peer_addr in current_peer_addresses:
@@ -219,12 +216,19 @@ class dreamnail:
                         curr_miner_msg = dreamnail.singleton.miner_msg if len(self.blockchain.chain) > 0 else dreamveil.Blockchain.GENESIS_MESSAGE
                         miner_reward_transaction = dreamveil.Transaction(my_address, {"BLOCK": str(block_reward)}, {my_address: str(block_reward)}, curr_miner_msg, "", "").sign(self.user_key)
                         mined_block.add_transaction(miner_reward_transaction)
-                        for pool_transaction in self.transaction_pool:
+                        for pool_transaction in self.transaction_pool.copy():
                             try:
                                 block_reward += pool_transaction.get_miner_fee()
                                 mined_block.add_transaction(pool_transaction)
-                                if not dreamveil.Block.verify_transactions(mined_block.transactions) or not self.blockchain.verify_block(mined_block, len(self.blockchain.chain)):
+                                try:
+                                    verify = dreamveil.Block.loads(mined_block.dumps())
+                                except AssertionError:
+                                    verify = None
+                                if verify is None:
                                     mined_block.remove_transaction(pool_transaction)
+                                    pool_transaction_node = self.blockchain.unspent_transactions_tree.find(pool_transaction.signature)
+                                    if pool_transaction_node is None:
+                                        self.transaction_pool.remove(pool_transaction)
                             except ValueError:
                                 break
 
@@ -665,7 +669,6 @@ class dreamnail:
                     dreamnail.singleton.remove_peer(self.address)
             finally:
                 self.socket.close()
-                del self
 
     def __init__(self):
         if dreamnail.singleton is not None:
@@ -1098,13 +1101,14 @@ class dreamnail:
             user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
             new_balance = decimal.Decimal(0)
             input_transactions = {}
-            for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
-                for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
-                    if transaction.signature == transaction_signature:
-                        transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
-                        if transaction_value is not None:
-                            new_balance += dreamveil.to_decimal(transaction_value)
-                            input_transactions[transaction.signature] = transaction_value
+            if user_address in self.blockchain.tracked:
+                for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
+                    for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
+                        if transaction.signature == transaction_signature:
+                            transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
+                            if transaction_value is not None:
+                                new_balance += dreamveil.to_decimal(transaction_value)
+                                input_transactions[transaction.signature] = transaction_value
             dreamnail.singleton.user_data["balance"] = new_balance
 
             self.ui.balanceLabel.setText(str(self.user_data["balance"]))
