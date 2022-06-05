@@ -259,7 +259,6 @@ class Block:
             return output
         except Exception as err:
             print("Block rejected!")
-            raise AssertionError("Block rejected.")
 
     def dumps(self):
         transactions_json_object = [tx.dumps() for tx in self.transactions]

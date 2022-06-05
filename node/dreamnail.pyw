@@ -220,18 +220,13 @@ class dreamnail:
                             try:
                                 block_reward += pool_transaction.get_miner_fee()
                                 mined_block.add_transaction(pool_transaction)
-                                try:
-                                    verify = dreamveil.Block.loads(mined_block.dumps())
-                                except AssertionError:
-                                    verify = None
-                                if verify is None:
+                                assert dreamveil.Block.loads(mined_block.dumps()) is not None
+                            except AssertionError:
+                                if pool_transaction in mined_block.transactions:
                                     mined_block.remove_transaction(pool_transaction)
-                                    pool_transaction_node = self.blockchain.unspent_transactions_tree.find(pool_transaction.signature)
-                                    if pool_transaction_node is None:
-                                        self.transaction_pool.remove(pool_transaction)
-                            except ValueError:
-                                break
-
+                                pool_transaction_node = self.blockchain.unspent_transactions_tree.find(pool_transaction.signature)
+                                if pool_transaction_node is None:
+                                    self.transaction_pool.remove(pool_transaction)
 
                     if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
                         if self.try_chain_block(mined_block):
