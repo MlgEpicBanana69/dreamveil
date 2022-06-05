@@ -398,7 +398,7 @@ class Blockchain:
             for input_source, input_amount in transaction.inputs.items():
                 if input_source != "BLOCK":
                     transaction_node = self.unspent_transactions_tree.find(input_source)
-                    if input_source is None:
+                    if transaction_node is None:
                         print("Block rejected in verify_block (referenced transaction does not exist)")
                         return False
                     if transaction.sender not in transaction_node.value.keys():

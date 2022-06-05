@@ -1095,6 +1095,18 @@ class dreamnail:
 
     def updateUserTab(self):
         if self.user_data != dreambench.USER_DATA_TEMPLATE:
+            user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
+            new_balance = decimal.Decimal(0)
+            input_transactions = {}
+            for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
+                for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
+                    if transaction.signature == transaction_signature:
+                        transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
+                        if transaction_value is not None:
+                            new_balance += dreamveil.to_decimal(transaction_value)
+                            input_transactions[transaction.signature] = transaction_value
+            dreamnail.singleton.user_data["balance"] = new_balance
+
             self.ui.balanceLabel.setText(str(self.user_data["balance"]))
             self.ui.userWalletAddressLineEdit.setText(dreamveil.key_to_address(self.user_data["key"]))
 
