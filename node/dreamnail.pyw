@@ -223,10 +223,13 @@ class dreamnail:
                         for pool_transaction in self.transaction_pool.copy():
                             if pool_transaction.signature not in [tx.signature for tx in mined_block.transactions]:
                                 mined_block.transactions.append(pool_transaction)
+                                mined_block.mine()
                                 if not dreamveil.Block.verify_transactions(mined_block.transactions):
                                     mined_block.transactions = mined_block.transactions[:-1]
+                                    mined_block.mine()
                                 elif len(mined_block.dumps()) > dreamveil.Block.MAX_SIZE:
                                     mined_block.transactions = mined_block.transactions[:-2]
+                                    mined_block.mine()
                                     break
 
                         curr_miner_msg = dreamnail.singleton.miner_msg if len(self.blockchain.chain) > 0 else dreamveil.Blockchain.GENESIS_MESSAGE

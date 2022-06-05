@@ -154,7 +154,8 @@ class Transaction:
     def dumps(self):
         information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
         output = json.dumps(information)
-        assert type(Transaction.loads(output)) == type(self)
+        if type(Transaction.loads(output)) != type(self):
+            print("WARNING dumped transaction is invalid!")
         return output
 
     def get_contents(self):
@@ -241,7 +242,8 @@ class Block:
         transactions_json_object = [tx.dumps() for tx in self.transactions]
         information = [self.previous_block_hash, transactions_json_object, self.nonce, self.block_hash]
         output = json.dumps(information)
-        assert type(Block.loads(output)) == type(self)
+        if type(Block.loads(output)) != type(self):
+            print("WARNING dumped block is invalid!")
         return output
 
     def get_contents(self):
