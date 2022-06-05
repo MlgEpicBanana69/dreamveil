@@ -224,9 +224,12 @@ class dreamnail:
                             except AssertionError:
                                 if pool_transaction in mined_block.transactions:
                                     mined_block.remove_transaction(pool_transaction)
+                            finally:
                                 pool_transaction_node = self.blockchain.unspent_transactions_tree.find(pool_transaction.signature)
-                                if pool_transaction_node is None:
+                                if pool_transaction_node is not None:
                                     self.transaction_pool.remove(pool_transaction)
+                                    if pool_transaction in mined_block.transactions:
+                                        mined_block.remove_transaction(pool_transaction)
 
                     if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
                         if self.try_chain_block(mined_block):
