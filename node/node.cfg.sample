@@ -1,6 +1,7 @@
 [METADATA]
-version = 1.0.0a
+version = 1.0.0b
 
 [SERVER]
 address = 127.0.0.1
 port = 22222
+max_peer_amount = 150

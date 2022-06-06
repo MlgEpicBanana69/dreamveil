@@ -1149,7 +1149,8 @@ class dreamnail:
     def open_server(self):
         server_address = self.application_config["SERVER"]["address"]
         server_port = int(self.application_config["SERVER"]["port"])
-        self.server = dreamnail.Server(server_address, server_port)
+        max_peer_amount = int(self.application_config["SERVER"]["max_peer_amount"])
+        self.server = dreamnail.Server(server_address, server_port, max_peer_amount)
 
     def close_server(self):
         if self.server is not None:

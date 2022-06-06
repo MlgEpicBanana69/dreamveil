@@ -1,17 +1,47 @@
 <mxfile host="65bd71144e">
     <diagram id="sSYUCETtDqEobELzKSt1" name="Page-1">
-        <mxGraphModel dx="1243" dy="417" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="549" dy="413" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="3" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="3" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="160" y="110" width="440" height="280" as="geometry"/>
                 </mxCell>
-                <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                <mxCell id="2" value="" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="170" y="160" width="420" height="220" as="geometry"/>
                 </mxCell>
-                <mxCell id="4" value="Blockchain" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;" vertex="1" parent="1">
+                <mxCell id="4" value="Blockchain" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;" parent="1" vertex="1">
                     <mxGeometry x="310" y="120" width="120" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="180" y="170" width="340" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="Block 1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" vertex="1" parent="1">
+                    <mxGeometry x="120" y="190" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="Block 2" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" vertex="1" parent="1">
+                    <mxGeometry x="250" y="190" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="Block n" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" vertex="1" parent="1">
+                    <mxGeometry x="430" y="190" width="90" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 3;strokeWidth=5;rounded=0;fontSize=20;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;jumpSize=17;jumpStyle=none;endSize=6;" edge="1" parent="1" source="7" target="6">
+                    <mxGeometry width="50" height="50" relative="1" as="geometry">
+                        <mxPoint x="560" y="370" as="sourcePoint"/>
+                        <mxPoint x="560" y="240" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="12" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="190" y="280" width="190" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="Unspent Transaction Tree" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" vertex="1" parent="1">
+                    <mxGeometry x="245" y="295" width="80" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="400" y="280" width="80" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="mass" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;" vertex="1" parent="1">
+                    <mxGeometry x="410" y="280" width="60" height="40" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
