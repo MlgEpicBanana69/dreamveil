@@ -68,7 +68,7 @@ class dreamnail:
             self.peer_pool = dreamnail.singleton.peer_pool
             self.transaction_pool = dreamnail.singleton.transaction_pool
 
-            self.difficulty_target = int(2**4) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+            self.difficulty_target = int(2**8) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
             self.peers = {}
             self.miner_open = False
             self.socket = None
