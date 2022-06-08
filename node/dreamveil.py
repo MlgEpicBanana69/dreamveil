@@ -42,25 +42,29 @@ def key_to_address(rsa_key:RSA.RsaKey):
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
-    def __init__(self, sender:str, inputs:dict, outputs:dict, message:str, signature:str):
+    def __init__(self, sender:str, inputs:dict, outputs:dict, message:str, nonce:str, signature:str):
         assert type(sender) == str
         assert type(inputs) == dict and type(outputs) == dict
         assert type(message) == str
+        assert type(nonce) == str and type(signature) == str
 
         self.sender = sender
         self.inputs = inputs
         self.outputs = outputs
         self.message = message
+        self.nonce = nonce
         self.signature = signature
 
     def __repr__(self):
         return self.dumps()
 
     def sign(self, private_key:RSA.RsaKey):
-        """Signs the transaction object
+        """Signs the transaction object after generating a random Nonce
            :param private_key: The private key related to the sender's wallet
            :returns: self"""
-        # Generate the transaction hash
+        # Generate and set a random Nonce
+        self.nonce = secrets.token_hex(32)
+        # Generate the transaction hash (Including the nonce)
         transaction_hash = SHA256.new(self.get_contents().encode())
         # Sign the transaction hash using the RSA private key
         digital_signature = pkcs1_15.new(private_key).sign(transaction_hash).hex()
@@ -130,13 +134,14 @@ class Transaction:
             assert len(json_str) < Transaction.MAX_TRANSACTION_SIZE
             information = json.loads(json_str)
             assert type(information) == list
-            assert len(information) == 5
+            assert len(information) == 6
 
             assert type(information[0]) == str and type(address_to_key(information[0])) == RSA.RsaKey
             assert type(information[1]) == dict
             assert type(information[2]) == dict
             assert type(information[3]) == str and len(information[3]) <= 222
-            assert type(information[4]) == str and len(information[5]) == 512
+            assert type(information[4]) == str and len(information[4]) == 64
+            assert type(information[5]) == str and len(information[5]) == 512
 
             transaction_object = Transaction(*information)
             assert transaction_object.verify_io()
@@ -147,16 +152,14 @@ class Transaction:
             return None
 
     def dumps(self):
-        information = [self.sender, self.inputs, self.outputs, self.message, self.signature]
-        if len(self.outputs) == 0:
-            print("OSUHOW??")
+        information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
         output = json.dumps(information)
         if type(Transaction.loads(output)) != type(self):
             print("WARNING dumped transaction is invalid!")
         return output
 
     def get_contents(self):
-        information = [self.sender, self.inputs, self.outputs, self.message]
+        information = [self.sender, self.inputs, self.outputs, self.message, self.nonce]
         return json.dumps(information)
 
     @staticmethod
@@ -310,14 +313,12 @@ class Blockchain:
 
     GENESIS_MESSAGE = r"""Dreamveil - The coolest blockchain, 12th grade cyber project."""
 
-    # unspent_transactions_tree
-    # Transaction signature: (spent, value)
-    def __init__(self, chain:list=None, mass:int=0, unspent_transactions_tree:data_structures.AVL=None, tracked:dict=None):
+    def __init__(self, chain:list=None, mass:int=0, unspent_transactions_tree:data_structures.AVL=None, tracklist:dict=None):
         if chain is None:
             chain = []
-        if tracked is None:
-            tracked = dict()
-        self.tracked = tracked
+        if tracklist is None:
+            tracklist = dict()
+        self.tracklist = tracklist
         self.chain = chain
         self.mass = mass
         self.unspent_transactions_tree = unspent_transactions_tree if unspent_transactions_tree is not None else data_structures.AVL()
@@ -362,10 +363,10 @@ class Blockchain:
                     # We remove the transaction's output as it was spent
                     intree_node.value.pop(transaction.sender)
 
-            # Track the transaction for each of the tracked addresss
-            for tracked_address in self.tracked.keys():
-                if tracked_address in transaction.inputs or tracked_address in transaction.outputs:
-                    self.tracked[tracked_address].append((new_block_index, transaction.signature))
+            # Track the transaction for each of the tracklist addresss
+            for tracklist_address in self.tracklist.keys():
+                if tracklist_address in transaction.inputs or tracklist_address in transaction.outputs:
+                    self.tracklist[tracklist_address].append((new_block_index, transaction.signature))
         return True
 
     def verify_block(self, block:Block, block_height:int):
@@ -405,7 +406,7 @@ class Blockchain:
         return True
 
     def dumps(self):
-        information = [[block.dumps() for block in self.chain], self.mass, self.unspent_transactions_tree.dumps(), self.tracked]
+        information = [[block.dumps() for block in self.chain], self.mass, self.unspent_transactions_tree.dumps(), self.tracklist]
         return json.dumps(information)
 
     @staticmethod

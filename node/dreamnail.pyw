@@ -30,10 +30,9 @@ import threading
 # Implement a block creator/editor/miner (DONE)
 # Fix threading and rework CHNSYN (DONE)
 
-# implement whitedoable env loading that's organized (WIP)
-# Implement the gui (WIP)
-# implement online communication-wide encryption (integrity and confidentiallity) (NIP)
-# implement a changing PoW difficulty (NIP)
+# implement whitedoable env loading that's organized (DONE)
+# Implement the gui (DONE)
+# implement a changing PoW difficulty (NIP-DEPRECATED)
 
 # Behavior of miner:
 #   Will use the most rewarding transactions to form a block.
@@ -68,7 +67,7 @@ class dreamnail:
             self.peer_pool = dreamnail.singleton.peer_pool
             self.transaction_pool = dreamnail.singleton.transaction_pool
 
-            self.difficulty_target = int(2**8) # TEMPORARLY USING A STATIC DIFFICULTY TARGET!!!
+            self.difficulty_target = int(2**4) # Static difficulty target
             self.peers = {}
             self.miner_open = False
             self.socket = None
@@ -78,9 +77,13 @@ class dreamnail:
             self.miner_thread = None
             self.seeker_thread = threading.Thread(target=self.seeker)
             self.accepter_thread = threading.Thread(target=self.accepter)
-            self.run_thread = threading.Thread(target=self.run)
 
-            self.run_thread.start()
+            dreamnail.singleton.log("Starting server and assigning seeker and accepter threads")
+            dreamnail.singleton.log("-----------------------------------------------------------")
+            self.accepter_thread.start()
+            self.seeker_thread.start()
+
+            dreamnail.singleton.log("Server is now running...")
 
         def roll_peer(self):
             peer_options = []
@@ -98,14 +101,6 @@ class dreamnail:
             else:
                 output = None
             return output
-
-        def run(self):
-            dreamnail.singleton.log("Starting server and assigning seeker and accepter threads")
-            dreamnail.singleton.log("-----------------------------------------------------------")
-            self.accepter_thread.start()
-            self.seeker_thread.start()
-
-            dreamnail.singleton.log("Server is now running...")
 
         def seeker(self):
             time.sleep(5)
@@ -284,7 +279,7 @@ class dreamnail:
                         user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
                         new_balance = decimal.Decimal(0)
                         input_transactions = {}
-                        for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
+                        for relevant_transaction_block_index, transaction_signature in self.blockchain.tracklist[user_address][::-1]:
                             for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
                                 if transaction.signature == transaction_signature:
                                     transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
@@ -549,7 +544,7 @@ class dreamnail:
                             return
 
                     # We swap the blockchain objects to the new larger one.
-                    new_blockchain.tracked = dreamnail.Server.singleton.blockchain.tracked.copy()
+                    new_blockchain.tracklist = dreamnail.Server.singleton.blockchain.tracklist.copy()
                     dreamnail.singleton.blockchain = new_blockchain
                     self.blockchain = dreamnail.singleton.blockchain
 
@@ -740,7 +735,6 @@ class dreamnail:
         self.ui.peerStatusLabel.setStyleSheet("QLabel { color: white; }")
 
         self.ui.hashRateLabel.setStyleSheet("QLabel { color: white; }")
-        self.ui.workingMinerThreadsLabel.setStyleSheet("QLabel { color: white; }")
 
         self.ui.blockchainMassLabel.setStyleSheet("QLabel { color: white; }")
         self.ui.Block1HashLabel.setStyleSheet("QLabel { color: black; background: lightGray; font-size: 10pt; }")
@@ -762,11 +756,8 @@ class dreamnail:
 
         self.server = None
 
-        # TODO: IMPLEMENT
-        self.transaction_pool = []
-
         dreamnail.singleton.log("Loading bench from saved files...")
-        self.blockchain, self.peer_pool = dreambench.load_bench()
+        self.blockchain, self.peer_pool, self.transaction_pool = dreambench.load_bench()
         for peer_address in self.peer_pool.keys():
             self.add_to_peer_pool_gui(peer_address)
         dreamnail.singleton.log("Finished loading bench")
@@ -869,7 +860,7 @@ class dreamnail:
         if dreambench.try_create_user(passphrase, username):
             new_user_data = self.loginButton_clicked()
             if new_user_data is not None:
-                self.blockchain.tracked[dreamveil.key_to_address(new_user_data["key"])] = []
+                self.blockchain.tracklist[dreamveil.key_to_address(new_user_data["key"])] = []
         else:
             QtWidgets.QMessageBox.critical(self.win, "Failed to register new user", "User already exists!")
 
@@ -979,11 +970,11 @@ class dreamnail:
 
     def createTransactionButton_clicked(self):
         user_address = dreamveil.key_to_address(self.user_data["key"])
-        if user_address in self.blockchain.tracked:
+        if user_address in self.blockchain.tracklist:
             output_sum = sum([dreamveil.to_decimal(val) for val in self.edited_transaction.outputs.values()])
             funds_sum = decimal.Decimal(0)
             input_transactions = {}
-            for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
+            for relevant_transaction_block_index, transaction_signature in self.blockchain.tracklist[user_address][::-1]:
                 for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
                     if transaction.signature not in self.edited_transaction.inputs and transaction.signature == transaction_signature:
                         transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
@@ -1123,8 +1114,8 @@ class dreamnail:
             user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
             new_balance = decimal.Decimal(0)
             input_transactions = {}
-            if user_address in self.blockchain.tracked:
-                for relevant_transaction_block_index, transaction_signature in self.blockchain.tracked[user_address][::-1]:
+            if user_address in self.blockchain.tracklist:
+                for relevant_transaction_block_index, transaction_signature in self.blockchain.tracklist[user_address][::-1]:
                     for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
                         if transaction.signature == transaction_signature:
                             transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
@@ -1180,6 +1171,7 @@ class dreamnail:
             self.close_server()
             dreambench.write_blockchain_file(self.blockchain)
             dreambench.write_peer_pool_file(self.peer_pool)
+            dreambench.write_transaction_pool_file(self.transaction_pool)
             if self.user_data != dreambench.USER_DATA_TEMPLATE and self.user_passphrase is not None:
                 dreambench.write_user_file(self.user_passphrase, self.user_data)
             self.log("Application Exit")

@@ -49,6 +49,17 @@ def load_bench():
         return peer_pool
     outputs.append(load_bench_file("peer_pool.json", loading_func))
 
+    def loading_func(contents, f):
+        if contents == "":
+            contents = "[]"
+            f.write(contents)
+        transaction_pool = json.loads(contents)
+        assert type(transaction_pool) == list
+        for i in range(len(transaction_pool)):
+            transaction_pool[i] = dreamveil.Transaction.loads(transaction_pool[i])
+        return transaction_pool
+    outputs.append(load_bench_file("transaction_pool.json", loading_func))
+
     return outputs
 
 def write_blockchain_file(blockchain:dreamveil.Blockchain):
@@ -58,6 +69,13 @@ def write_blockchain_file(blockchain:dreamveil.Blockchain):
 def write_peer_pool_file(peer_pool:dict):
     with open(APPLICATION_PATH + "\\bench\\peer_pool.json", "w") as peer_pool_file:
         peer_pool_file.write(json.dumps(peer_pool))
+
+def write_transaction_pool_file(transaction_pool:list):
+    output = []
+    for i in range(len(transaction_pool)):
+        output[i] = dreamveil.Transaction.dumps(transaction_pool[i])
+    with open(APPLICATION_PATH + "\\bench\\transaction_pool.json", "w") as transaction_pool_file:
+        transaction_pool_file.write(json.dumps(output))
 
 def try_read_user_file(passphrase:str, username:str):
     with open(APPLICATION_PATH + f"\\bench\\users\\{username}", "rb") as user_file:
@@ -80,6 +98,7 @@ def write_user_file(passphrase:str, user_data:dict):
             user_file_contents = json.dumps(user_file_contents)
             user_file_contents = dreamshield.encrypt(passphrase, user_file_contents)
             user_file.write(user_file_contents)
+            del user_file_contents
             return True
         except (ValueError, json.JSONDecodeError):
             return False
