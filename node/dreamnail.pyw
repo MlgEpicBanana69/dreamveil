@@ -389,7 +389,7 @@ class dreamnail:
                     self.send("SUCCESS")
                     time.sleep(0.05)
 
-                if self.peer_chain_mass > dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
+                if self.peer_chain_mass >= dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
                     dreamnail.singleton.log(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {dreamnail.Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
@@ -505,7 +505,7 @@ class dreamnail:
             my_chain_mass = dreamnail.Server.singleton.blockchain.mass
             my_chain_len = len(dreamnail.Server.singleton.blockchain.chain)
 
-            if peer_chain_mass > my_chain_mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
+            if peer_chain_mass >= my_chain_mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
                 # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
                 self.send(f"{my_chain_mass} {my_chain_len}")
                 assert self.read_last_message() == "ACK"
@@ -666,7 +666,7 @@ class dreamnail:
                             dreamnail.singleton.log(f"### Succesfuly executed {command} with {self.address}")
 
                 dreamnail.singleton.log(f"### Succesfuly executed {command} with {self.address}")
-                if self.peer_chain_mass > dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
+                if self.peer_chain_mass >= dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
                     dreamnail.singleton.log(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {dreamnail.Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
