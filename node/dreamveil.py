@@ -42,29 +42,25 @@ def key_to_address(rsa_key:RSA.RsaKey):
 class Transaction:
     MAX_TRANSACTION_SIZE = 1048576 # Max transaction size (1MB)
 
-    def __init__(self, sender:str, inputs:dict, outputs:dict, message:str, nonce:str, signature:str):
+    def __init__(self, sender:str, inputs:dict, outputs:dict, message:str, signature:str):
         assert type(sender) == str
         assert type(inputs) == dict and type(outputs) == dict
         assert type(message) == str
-        assert type(nonce) == str and type(signature) == str
 
         self.sender = sender
         self.inputs = inputs
         self.outputs = outputs
         self.message = message
-        self.nonce = nonce
         self.signature = signature
 
     def __repr__(self):
         return self.dumps()
 
     def sign(self, private_key:RSA.RsaKey):
-        """Signs the transaction object after generating a random Nonce
+        """Signs the transaction object
            :param private_key: The private key related to the sender's wallet
            :returns: self"""
-        # Generate and set a random Nonce
-        self.nonce = secrets.token_hex(32)
-        # Generate the transaction hash (Including the nonce)
+        # Generate the transaction hash
         transaction_hash = SHA256.new(self.get_contents().encode())
         # Sign the transaction hash using the RSA private key
         digital_signature = pkcs1_15.new(private_key).sign(transaction_hash).hex()
@@ -134,14 +130,13 @@ class Transaction:
             assert len(json_str) < Transaction.MAX_TRANSACTION_SIZE
             information = json.loads(json_str)
             assert type(information) == list
-            assert len(information) == 6
+            assert len(information) == 5
 
             assert type(information[0]) == str and type(address_to_key(information[0])) == RSA.RsaKey
             assert type(information[1]) == dict
             assert type(information[2]) == dict
             assert type(information[3]) == str and len(information[3]) <= 222
-            assert type(information[4]) == str and len(information[4]) == 64
-            assert type(information[5]) == str and len(information[5]) == 512
+            assert type(information[4]) == str and len(information[5]) == 512
 
             transaction_object = Transaction(*information)
             assert transaction_object.verify_io()
@@ -152,7 +147,7 @@ class Transaction:
             return None
 
     def dumps(self):
-        information = [self.sender, self.inputs, self.outputs, self.message, self.nonce, self.signature]
+        information = [self.sender, self.inputs, self.outputs, self.message, self.signature]
         if len(self.outputs) == 0:
             print("OSUHOW??")
         output = json.dumps(information)
@@ -161,7 +156,7 @@ class Transaction:
         return output
 
     def get_contents(self):
-        information = [self.sender, self.inputs, self.outputs, self.message, self.nonce]
+        information = [self.sender, self.inputs, self.outputs, self.message]
         return json.dumps(information)
 
     @staticmethod
