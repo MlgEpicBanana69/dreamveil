@@ -15,13 +15,12 @@ import time
 import atexit
 import pyperclip
 import decimal
+import threading
 
 from Crypto.Hash import SHA256
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
-import socket
-import threading
 
 # TODO TASKS (AMOGUS):
 # Implement transaction pool storing (DONE)
@@ -310,8 +309,8 @@ class dreamnail:
         def __init__(self, socket, address):
             dreamnail.Connection.connection_lock.acquire()
             try:
-                self.lock = threading.Lock()
-                self.lock.acquire()
+                self.command_lock = threading.Lock()
+                self.command_lock.acquire()
                 self.last_message = None
                 self.socket = socket
                 self.address = address
@@ -390,7 +389,7 @@ class dreamnail:
                     chnsyn_thread.start()
 
                 dreamnail.singleton.log(f"### Connection with {self.address} completed setup (version: {peer_version})")
-                self.lock.release()
+                self.command_lock.release()
             except (AssertionError, TimeoutError, ValueError) as err:
                 dreamnail.singleton.log(f"!!! Failed to initialize connection in setup with {self.address} (ver: {peer_version}) due to {type(err)}: {err.args}")
                 # Terminate the connection
@@ -434,7 +433,6 @@ class dreamnail:
                 dreamnail.singleton.log(f"Failed to send message to {self.address} due to error: {type(err)}: {err.args}")
                 self.close()
                 raise
-                return
 
         def recv(self):
             try:
@@ -459,7 +457,7 @@ class dreamnail:
 
         def connection_command(command_func):
             def wrapper(self, *args, **kwargs):
-                self.lock.acquire()
+                self.command_lock.acquire()
                 try:
                     dreamnail.singleton.log(f"### Locked {command_func.__name__} in {self.address}")
                     self.send(command_func.__name__)
@@ -470,7 +468,7 @@ class dreamnail:
                 finally:
                     time.sleep(0.05)
                     dreamnail.singleton.log(f"{command_func} finished {self.address}")
-                    self.lock.release()
+                    self.command_lock.release()
             return wrapper
 
         #region connection commands
@@ -570,7 +568,7 @@ class dreamnail:
                 return False
             if len(command) < dreamnail.Connection.COMMAND_SIZE or command not in commands:
                 return False
-            self.lock.acquire()
+            self.command_lock.acquire()
             self.last_message = None
             try:
                 # I GOT ...
@@ -672,7 +670,7 @@ class dreamnail:
                 dreamnail.singleton.log(log_str)
                 return False
             finally:
-                self.lock.release()
+                self.command_lock.release()
 
         def close(self, remove_peer=True):
             if self.closed:
