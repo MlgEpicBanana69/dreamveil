@@ -50,9 +50,9 @@ class dreamnail:
         PEER_STATUS_CONVERSED = "CONVERSED"
         PEER_STATUS_OFFLINE = "OFFLINE"
         PEER_STATUS_UNKNOWN = "UNKNOWN"
-        TRUST_HEIGHT = 6
+        TRUST_MULTIPLIER = 6
 
-        def __init__(self, address:str, port:int=22222, max_peer_amount:int=150):
+        def __init__(self, address:str, port:int, max_peer_amount:int, difficulty_target:int):
             if dreamnail.Server.singleton is not None:
                 raise Exception("Singleton class limited to one instance")
             dreamnail.Server.singleton = self
@@ -66,7 +66,8 @@ class dreamnail:
             self.peer_pool = dreamnail.singleton.peer_pool
             self.transaction_pool = dreamnail.singleton.transaction_pool
 
-            self.difficulty_target = int(2**4) # Static difficulty target
+            self.difficulty_target = difficulty_target
+            self.block_times = []
             self.peers = {}
             self.miner_open = False
             self.socket = None
@@ -77,6 +78,7 @@ class dreamnail:
             self.seeker_thread = threading.Thread(target=self.seeker)
             self.accepter_thread = threading.Thread(target=self.accepter)
 
+            dreamnail.singleton.ui.difficultyTargetLabel.setText(str(int(math.log2(self.difficulty_target))))
             dreamnail.singleton.log("Starting server and assigning seeker and accepter threads")
             dreamnail.singleton.log("-----------------------------------------------------------")
             self.accepter_thread.start()
@@ -205,6 +207,8 @@ class dreamnail:
             my_chain_len = None
             my_address = dreamveil.key_to_address(self.user_key)
             try:
+                hash_count = 0
+                start_time = timeit.default_timer()
                 while not self.closed and self.miner_open:
                     # Refresh the currently mined block when a new transaction is added to the pool
                     # Also refresh the block once our top block changes (We chained a block.)
@@ -234,7 +238,6 @@ class dreamnail:
                         mined_block.transactions.append(miner_reward_transaction)
                         mined_block.mine()
 
-
                     if dreamveil.Block.calculate_block_hash_difficulty(mined_block.block_hash) >= self.difficulty_target:
                         if self.try_chain_block(mined_block):
                             dreamnail.singleton.log(f"### MINED BLOCK {mined_block.block_hash}")
@@ -245,6 +248,12 @@ class dreamnail:
                             mined_block.mine()
                     else:
                         mined_block.mine()
+                    hash_count += 1
+                    if hash_count == 200:
+                        hash_speed = round(200 / (timeit.default_timer() - start_time), 2)
+                        dreamnail.singleton.ui.hashRateLabel.setText(str(hash_speed))
+                        start_time = timeit.default_timer()
+                        hash_count = 0
             finally:
                 dreamnail.singleton.log("Miner is now shutdown.")
 
@@ -268,6 +277,18 @@ class dreamnail:
             try:
                 if self.blockchain.chain_block(block):
                     dreamnail.singleton.log(f"### SUCCESFULY CHAINED BLOCK {block.block_hash}")
+                    current_block_time = timeit.default_timer()
+                    self.block_times.append(current_block_time)
+                    if len(self.block_times) == dreamnail.Server.TRUST_MULTIPLIER:
+                        average_time = dreamveil.Blockchain.AVERAGE_TIME_PER_BLOCK * dreamnail.Server.TRUST_MULTIPLIER
+                        result_time = self.block_times[-1] - self.block_times[0]
+                        time_ratio = average_time / result_time
+                        new_pow_exponent = round(math.log2(time_ratio * self.difficulty_target))
+                        self.difficulty_target = 2**new_pow_exponent
+                        dreamnail.singleton.application_config["SERVER"]["difficulty_target"] = str(2**new_pow_exponent)
+                        dreamnail.singleton.ui.difficultyTargetLabel.setText(str(self.difficulty_target))
+                        self.block_times = [self.block_times[-1]]
+
                     if dreamnail.singleton.ui.tabWidget.currentIndex() == 3:
                         dreamnail.singleton.updateBlockchainExplorerTab()
 
@@ -383,7 +404,7 @@ class dreamnail:
                     self.send("SUCCESS")
                     time.sleep(0.05)
 
-                if self.peer_chain_mass >= dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
+                if self.peer_chain_mass >= dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_MULTIPLIER:
                     dreamnail.singleton.log(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {dreamnail.Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
@@ -498,7 +519,7 @@ class dreamnail:
             my_chain_mass = dreamnail.Server.singleton.blockchain.mass
             my_chain_len = len(dreamnail.Server.singleton.blockchain.chain)
 
-            if peer_chain_mass >= my_chain_mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
+            if peer_chain_mass >= my_chain_mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_MULTIPLIER:
                 # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
                 self.send(f"{my_chain_mass} {my_chain_len}")
                 assert self.read_last_message() == "ACK"
@@ -659,7 +680,7 @@ class dreamnail:
                             dreamnail.singleton.log(f"### Succesfuly executed {command} with {self.address}")
 
                 dreamnail.singleton.log(f"### Succesfuly executed {command} with {self.address}")
-                if self.peer_chain_mass >= dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_HEIGHT:
+                if self.peer_chain_mass >= dreamnail.Server.singleton.blockchain.mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_MULTIPLIER:
                     dreamnail.singleton.log(f"### Noticed that we use a significantly larger chain than {self.address} (dM-chain = {dreamnail.Server.singleton.blockchain.mass - self.peer_chain_mass} Starting to sync with it")
                     chnsyn_thread = threading.Thread(target=self.CHNSYN)
                     chnsyn_thread.start()
@@ -731,6 +752,7 @@ class dreamnail:
         self.ui.peersConnectedLabel.setStyleSheet("QLabel { color: white; }")
         self.ui.peerPoolLabel.setStyleSheet("QLabel { color: white; }")
         self.ui.peerStatusLabel.setStyleSheet("QLabel { color: white; }")
+        self.ui.difficultyTargetLabel.setStyleSheet("QLabel { color: white; }")
 
         self.ui.hashRateLabel.setStyleSheet("QLabel { color: white; }")
 
@@ -747,6 +769,7 @@ class dreamnail:
         self.application_config = configparser.ConfigParser()
         self.application_config.read(APPLICATION_PATH + "\\node.cfg")
         self.VERSION = self.application_config["METADATA"]["version"]
+        self.application_config["SERVER"]["difficulty_target"] = str(2**int(self.application_config["SERVER"]["difficulty_target"]))
 
         self.user_data = dreambench.USER_DATA_TEMPLATE.copy()
         self.miner_msg = ""
@@ -766,12 +789,22 @@ class dreamnail:
     #region ui events
     def tabWidget_currentChanged(self):
         match self.ui.tabWidget.currentIndex():
-            case 3:
-                self.updateBlockchainExplorerTab()
-            case 2:
+            case 0: # About tab
+                pass
+            case 1: # Login tab
+                pass
+            case 2: # User tab
                 self.updateUserTab()
-            case 6:
+            case 3: # Blockchain explorer tab
+                self.updateBlockchainExplorerTab()
+            case 4: # Server tab
+                self.updateServerTab()
+            case 5: # Miner tab
+                pass
+            case 6: # Transaction editor tab
                 self.updateTransactionEditorTab()
+            case 7: # Log tab
+                pass
 
     def loginButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
@@ -1133,13 +1166,17 @@ class dreamnail:
         self.ui.transactionMsgTextEdit.setPlainText("")
         self.ui.TransactionOutputSelectCombobox.clear()
         self.ui.createTransactionButton.setEnabled(False)
+
+    def updateServerTab(self):
+        self.ui.difficultyTargetLabel.setText(str(int(math.log2(int(self.application_config["SERVER"]["difficulty_target"])))))
     #endregion
 
     def open_server(self):
         server_address = self.application_config["SERVER"]["address"]
         server_port = int(self.application_config["SERVER"]["port"])
         max_peer_amount = int(self.application_config["SERVER"]["max_peer_amount"])
-        self.server = dreamnail.Server(server_address, server_port, max_peer_amount)
+        difficulty_target = int(self.application_config["SERVER"]["difficulty_target"])
+        self.server = dreamnail.Server(server_address, server_port, max_peer_amount, difficulty_target)
 
     def close_server(self):
         if self.server is not None:
@@ -1170,6 +1207,7 @@ class dreamnail:
             dreambench.write_blockchain_file(self.blockchain)
             dreambench.write_peer_pool_file(self.peer_pool)
             dreambench.write_transaction_pool_file(self.transaction_pool)
+            dreambench.write_config_file(self.application_config)
             if self.user_data != dreambench.USER_DATA_TEMPLATE and self.user_passphrase is not None:
                 dreambench.write_user_file(self.user_passphrase, self.user_data)
             self.log("Application Exit")

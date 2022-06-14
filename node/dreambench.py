@@ -1,3 +1,4 @@
+import math
 import dreamveil
 import dreamshield
 
@@ -76,6 +77,11 @@ def write_transaction_pool_file(transaction_pool:list):
         output[i] = dreamveil.Transaction.dumps(transaction_pool[i])
     with open(APPLICATION_PATH + "\\bench\\transaction_pool.json", "w") as transaction_pool_file:
         transaction_pool_file.write(json.dumps(output))
+
+def write_config_file(application_config):
+    with open(APPLICATION_PATH + "\\node.cfg", "w") as cfg_file:
+        application_config["SERVER"]["difficulty_target"] = str(int(math.log2(int(application_config["SERVER"]["difficulty_target"]))))
+        cfg_file.write(application_config)
 
 def try_read_user_file(passphrase:str, username:str):
     with open(APPLICATION_PATH + f"\\bench\\users\\{username}", "rb") as user_file:
