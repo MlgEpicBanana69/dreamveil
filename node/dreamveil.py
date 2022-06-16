@@ -307,7 +307,7 @@ class Block:
 
 class Blockchain:
     AVERAGE_TIME_PER_BLOCK = 300 # in seconds
-    BLOCK_REWARD_SEASON = (0.5*365*24*60*60/AVERAGE_TIME_PER_BLOCK) # 52560
+    BLOCK_REWARD_SEASON = (365*24*60*60/AVERAGE_TIME_PER_BLOCK) # 105120
     BLOCK_INITIAL_REWARD = 727
     BLOCK_REWARD_SUM = BLOCK_REWARD_SEASON * BLOCK_INITIAL_REWARD * 2 # 76422240
 
@@ -433,10 +433,10 @@ class Blockchain:
         """
         Calculate the reward of the block using a predefined geometric series
 
-        We divide block reward in two every 52560 blocks (half a year if 5m per block)
-        a0 = 727 * 52560 = 38211120
-        sum of geometric series = 2 * a0 = 76422240
-        Total currency amount 76422240
+        We divide block reward in two every 105120 blocks (one year if 5m per block)
+        a0 = 727 * 105120 = 76422240
+        sum of geometric series = 2 * a0 = 152844480
+        Total currency amount 152844480
 
         :param Height: Height of the block
         :returns: decimal.Decimal block_reward

@@ -78,6 +78,7 @@ class dreamnail:
             self.seeker_thread = threading.Thread(target=self.seeker)
             self.accepter_thread = threading.Thread(target=self.accepter)
 
+            self.hashrate = "0"
             dreamnail.singleton.ui.difficultyTargetLabel.setText(str(int(math.log2(self.difficulty_target))))
             dreamnail.singleton.log("Starting server and assigning seeker and accepter threads")
             dreamnail.singleton.log("-----------------------------------------------------------")
@@ -251,7 +252,7 @@ class dreamnail:
                     hash_count += 1
                     if hash_count == 200:
                         hash_speed = round(200 / (timeit.default_timer() - start_time), 2)
-                        dreamnail.singleton.ui.hashRateLabel.setText(str(hash_speed))
+                        self.hashrate = str(hash_speed)
                         start_time = timeit.default_timer()
                         hash_count = 0
             finally:
@@ -730,6 +731,8 @@ class dreamnail:
         self.ui.passwordLineEdit.textChanged.connect(self.passwordLineEdit_textChanged)
         self.ui.minerMsgTextEdit.textChanged.connect(self.minerMsgTextEdit_textChanged)
         self.ui.minerStateButton.clicked.connect(self.minerStateButton_clicked)
+        self.ui.hashRateTimer = QtCore.QTimer()
+        self.ui.hashRateTimer.timeout.connect(self.hashRateTimer_timeout)
         self.ui.peerPoolComboBox.currentIndexChanged.connect(self.peerPoolComboBox_currentIndexChanged)
         self.ui.blockchainNextButton.clicked.connect(self.blockchainNextButton_clicked)
         self.ui.blockchainPreviousButton.clicked.connect(self.blockchainPreviousButton_clicked)
@@ -1079,6 +1082,10 @@ class dreamnail:
     def TransactionMsgTextEdit_textChanged(self):
         if self.edited_transaction is not None:
             self.edited_transaction.message = self.ui.transactionMsgTextEdit.toPlainText()
+    
+    def hashRateTimer_timeout(self):
+        if self.server is not None and self.ui.tabWidget.currentIndex() == 5:
+            self.ui.hashRateLabel.setText(self.server.hashrate)
     #endregion
 
     #region Tab updates
@@ -1177,9 +1184,11 @@ class dreamnail:
         max_peer_amount = int(self.application_config["SERVER"]["max_peer_amount"])
         difficulty_target = int(self.application_config["SERVER"]["difficulty_target"])
         self.server = dreamnail.Server(server_address, server_port, max_peer_amount, difficulty_target)
+        self.ui.hashRateTimer.start(1000)
 
     def close_server(self):
         if self.server is not None:
+            self.ui.hashRateTimer.stop()
             self.server.close()
             self.server = None
 
