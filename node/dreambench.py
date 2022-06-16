@@ -81,7 +81,7 @@ def write_transaction_pool_file(transaction_pool:list):
 def write_config_file(application_config):
     with open(APPLICATION_PATH + "\\node.cfg", "w") as cfg_file:
         application_config["SERVER"]["difficulty_target"] = str(int(math.log2(int(application_config["SERVER"]["difficulty_target"]))))
-        cfg_file.write(application_config)
+        application_config.write(cfg_file)
 
 def try_read_user_file(passphrase:str, username:str):
     with open(APPLICATION_PATH + f"\\bench\\users\\{username}", "rb") as user_file:
