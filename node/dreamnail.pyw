@@ -284,7 +284,7 @@ class dreamnail:
                         result_time = self.block_times[-1] - self.block_times[0]
                         time_ratio = average_time / result_time
                         new_pow_exponent = round(math.log2(time_ratio * self.difficulty_target))
-                        dreamnail.singleton.log(f"Recalculated difficulty target. (avg. dt = {result_time / dreamnail.SERVER.TRUST_MULTIPLIER})")
+                        dreamnail.singleton.log(f"Recalculated difficulty target. (avg. dt = {result_time / dreamnail.Server.TRUST_MULTIPLIER})")
                         self.difficulty_target = 2**new_pow_exponent
                         dreamnail.singleton.application_config["SERVER"]["difficulty_target"] = str(2**new_pow_exponent)
                         self.block_times = [self.block_times[-1]]
