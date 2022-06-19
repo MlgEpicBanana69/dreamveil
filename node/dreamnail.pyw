@@ -79,7 +79,6 @@ class dreamnail:
             self.accepter_thread = threading.Thread(target=self.accepter)
 
             self.hashrate = "0"
-            dreamnail.singleton.ui.difficultyTargetLabel.setText(str(int(math.log2(self.difficulty_target))))
             dreamnail.singleton.log("Starting server and assigning seeker and accepter threads")
             dreamnail.singleton.log("-----------------------------------------------------------")
             self.accepter_thread.start()
@@ -287,11 +286,7 @@ class dreamnail:
                         new_pow_exponent = round(math.log2(time_ratio * self.difficulty_target))
                         self.difficulty_target = 2**new_pow_exponent
                         dreamnail.singleton.application_config["SERVER"]["difficulty_target"] = str(2**new_pow_exponent)
-                        dreamnail.singleton.ui.difficultyTargetLabel.setText(str(self.difficulty_target))
                         self.block_times = [self.block_times[-1]]
-
-                    if dreamnail.singleton.ui.tabWidget.currentIndex() == 3:
-                        dreamnail.singleton.updateBlockchainExplorerTab()
 
                     for transaction in block.transactions:
                         if "BLOCK" not in transaction.inputs:
@@ -721,7 +716,7 @@ class dreamnail:
         self.ui.setupUi(self.win)
 
         self.win.closeEvent = lambda event: self.exit_handler()
-        self.ui.tabWidget.currentChanged.connect(self.tabWidget_currentChanged)
+        self.ui.tabWidget.currentChanged.connect(self.guiTimer_timeout)
         self.ui.loginButton.clicked.connect(self.loginButton_clicked)
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
         self.ui.walletAddressCopyButton.clicked.connect(self.walletAddressCopyButton_clicked)
@@ -731,8 +726,9 @@ class dreamnail:
         self.ui.passwordLineEdit.textChanged.connect(self.passwordLineEdit_textChanged)
         self.ui.minerMsgTextEdit.textChanged.connect(self.minerMsgTextEdit_textChanged)
         self.ui.minerStateButton.clicked.connect(self.minerStateButton_clicked)
-        self.ui.hashRateTimer = QtCore.QTimer()
-        self.ui.hashRateTimer.timeout.connect(self.hashRateTimer_timeout)
+        self.ui.guiTimer = QtCore.QTimer()
+        self.ui.guiTimer.timeout.connect(self.guiTimer_timeout)
+        self.ui.guiTimer.start(500)
         self.ui.peerPoolComboBox.currentIndexChanged.connect(self.peerPoolComboBox_currentIndexChanged)
         self.ui.blockchainNextButton.clicked.connect(self.blockchainNextButton_clicked)
         self.ui.blockchainPreviousButton.clicked.connect(self.blockchainPreviousButton_clicked)
@@ -790,25 +786,6 @@ class dreamnail:
         sys.exit(self.app.exec())
 
     #region ui events
-    def tabWidget_currentChanged(self):
-        match self.ui.tabWidget.currentIndex():
-            case 0: # About tab
-                pass
-            case 1: # Login tab
-                pass
-            case 2: # User tab
-                self.updateUserTab()
-            case 3: # Blockchain explorer tab
-                self.updateBlockchainExplorerTab()
-            case 4: # Server tab
-                self.updateServerTab()
-            case 5: # Miner tab
-                pass
-            case 6: # Transaction editor tab
-                self.updateTransactionEditorTab()
-            case 7: # Log tab
-                pass
-
     def loginButton_clicked(self):
         username = self.ui.usernameLineEdit.text()
         passphrase = SHA256.new(self.ui.passwordLineEdit.text().encode()).hexdigest()
@@ -1082,10 +1059,29 @@ class dreamnail:
     def TransactionMsgTextEdit_textChanged(self):
         if self.edited_transaction is not None:
             self.edited_transaction.message = self.ui.transactionMsgTextEdit.toPlainText()
-    
+
     def hashRateTimer_timeout(self):
         if self.server is not None and self.ui.tabWidget.currentIndex() == 5:
             self.ui.hashRateLabel.setText(self.server.hashrate)
+
+    def guiTimer_timeout(self):
+        match self.ui.tabWidget.currentIndex():
+            case 0: # About tab
+                pass
+            case 1: # Login tab
+                pass
+            case 2: # User tab
+                self.updateUserTab()
+            case 3: # Blockchain explorer tab
+                self.updateBlockchainExplorerTab()
+            case 4: # Server tab
+                self.updateServerTab()
+            case 5: # Miner tab
+                self.updateMinerTab()
+            case 6: # Transaction editor tab
+                self.updateTransactionEditorTab()
+            case 7: # Log tab
+                pass
     #endregion
 
     #region Tab updates
@@ -1165,6 +1161,12 @@ class dreamnail:
             self.ui.balanceLabel.setText(str(self.user_data["balance"]))
             self.ui.userWalletAddressLineEdit.setText(dreamveil.key_to_address(self.user_data["key"]))
 
+    def updateMinerTab(self):
+        if self.server is not None:
+            self.ui.hashRateLabel.setText(self.server.hashrate)
+        elif self.ui.hashRateLabel.text() != "0":
+            self.ui.hashRateLabel.setText("0")
+
     def updateTransactionEditorTab(self):
         if self.user_data != dreambench.USER_DATA_TEMPLATE:
             self.edited_transaction = dreamveil.Transaction(dreamveil.key_to_address(self.user_data["key"]), {}, {}, "", "", "")
@@ -1184,11 +1186,9 @@ class dreamnail:
         max_peer_amount = int(self.application_config["SERVER"]["max_peer_amount"])
         difficulty_target = int(self.application_config["SERVER"]["difficulty_target"])
         self.server = dreamnail.Server(server_address, server_port, max_peer_amount, difficulty_target)
-        self.ui.hashRateTimer.start(1000)
 
     def close_server(self):
         if self.server is not None:
-            self.ui.hashRateTimer.stop()
             self.server.close()
             self.server = None
 
