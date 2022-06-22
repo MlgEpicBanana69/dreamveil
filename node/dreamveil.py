@@ -213,6 +213,7 @@ class Block:
     @staticmethod
     def loads(json_str):
         try:
+            critical_err = True
             assert len(json_str.encode()) <= Block.MAX_SIZE
             information = json.loads(json_str)
             assert type(information) == list
@@ -233,17 +234,17 @@ class Block:
 
             output = Block(*information)
             assert output.verify_hash()
+            critical_err = False
             assert output.verify_block_has_reward()
             return output
         except Exception as err:
-            print("Block rejected!")
+            if critical_err:
+                print("Block rejected!")
 
     def dumps(self):
         transactions_json_object = [tx.dumps() for tx in self.transactions]
         information = [self.previous_block_hash, transactions_json_object, self.nonce, self.block_hash]
         output = json.dumps(information)
-        if type(Block.loads(output)) != type(self):
-            print("WARNING dumped block is invalid!")
         return output
 
     def get_contents(self):
