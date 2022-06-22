@@ -571,7 +571,7 @@ class dreamnail:
                     # We swap the blockchain objects to the new larger one.
                     new_blockchain.tracklist = dreamnail.Server.singleton.blockchain.tracklist.copy()
                     dreamnail.singleton.blockchain = new_blockchain
-                    self.blockchain = dreamnail.singleton.blockchain
+                    dreamnail.Server.singleton.blockchain = dreamnail.singleton.blockchain
 
                     # Remove all of the outdated pool transactions
                     for block in new_blockchain.chain:
