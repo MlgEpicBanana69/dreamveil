@@ -1073,6 +1073,17 @@ class dreamnail:
 
     def guiTimer_timeout(self):
         match self.ui.tabWidget.currentIndex():
+            case 2: # User tab
+                self.updateUserTab()
+            case 3: # Blockchain explorer tab
+                self.updateBlockchainExplorerTab()
+            case 4: # Server tab
+                self.updateServerTab()
+            case 5: # Miner tab
+                self.updateMinerTab()
+
+    def tabWidget_indexChanged(self):
+        match self.ui.tabWidget.currentIndex():
             case 0: # About tab
                 pass
             case 1: # Login tab
