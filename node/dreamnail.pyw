@@ -723,7 +723,7 @@ class dreamnail:
         self.ui.setupUi(self.win)
 
         self.win.closeEvent = lambda event: self.exit_handler()
-        self.ui.tabWidget.currentChanged.connect(self.guiTimer_timeout)
+        self.ui.tabWidget.currentChanged.connect(self.tabWidget_currentChanged)
         self.ui.loginButton.clicked.connect(self.loginButton_clicked)
         self.ui.logoutButton.clicked.connect(self.logoutButton_clicked)
         self.ui.walletAddressCopyButton.clicked.connect(self.walletAddressCopyButton_clicked)
@@ -1082,7 +1082,7 @@ class dreamnail:
             case 5: # Miner tab
                 self.updateMinerTab()
 
-    def tabWidget_indexChanged(self):
+    def tabWidget_currentChanged(self):
         match self.ui.tabWidget.currentIndex():
             case 0: # About tab
                 pass
