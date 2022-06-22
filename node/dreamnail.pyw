@@ -297,18 +297,21 @@ class dreamnail:
 
                     for transaction in block.transactions:
                         if "BLOCK" not in transaction.inputs:
-                            self.remove_from_transaction_pool(transaction)
+                            self.remove_from_transaction_pool(transaction.signature)
 
                         user_address = dreamveil.key_to_address(dreamnail.singleton.user_data["key"])
                         new_balance = decimal.Decimal(0)
                         input_transactions = {}
-                        for relevant_transaction_block_index, transaction_signature in self.blockchain.tracklist[user_address][::-1]:
-                            for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
-                                if transaction.signature == transaction_signature:
-                                    transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
-                                    if transaction_value is not None:
-                                        new_balance += dreamveil.to_decimal(transaction_value)
-                                        input_transactions[transaction.signature] = transaction_value
+                        if user_address in self.blockchain.tracklist:
+                            for relevant_transaction_block_index, transaction_signature in self.blockchain.tracklist[user_address][::-1]:
+                                for transaction in self.blockchain.chain[relevant_transaction_block_index].transactions:
+                                    if transaction.signature == transaction_signature:
+                                        transaction_value = self.blockchain.calculate_transaction_value(transaction, user_address)
+                                        if transaction_value is not None:
+                                            new_balance += dreamveil.to_decimal(transaction_value)
+                                            input_transactions[transaction.signature] = transaction_value
+                        else:
+                            dreamnail.singleton.log("### WARNING: user address not in tracklist.")
                         dreamnail.singleton.user_data["balance"] = new_balance
 
                     current_peer_addresses = list(self.peers.keys())
