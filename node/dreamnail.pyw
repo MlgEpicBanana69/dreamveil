@@ -67,7 +67,7 @@ class dreamnail:
             self.transaction_pool = dreamnail.singleton.transaction_pool
 
             self.difficulty_target = difficulty_target
-            self.block_times = []
+            self.block_times = [0]
             self.peers = {}
             self.miner_open = False
             self.socket = None
@@ -281,12 +281,13 @@ class dreamnail:
                     dreamnail.singleton.log(f"### SUCCESFULY CHAINED BLOCK {block.block_hash}")
                     current_block_time = timeit.default_timer()
                     self.block_times.append(current_block_time)
-                    if len(self.block_times) == dreamnail.Server.TRUST_MULTIPLIER:
-                        average_time = dreamveil.Blockchain.AVERAGE_TIME_PER_BLOCK * dreamnail.Server.TRUST_MULTIPLIER
+                    wait_parameter = 2 # dreamnail.Server.TRUST_MULTIPLIER
+                    if len(self.block_times) == wait_parameter:
+                        average_time = dreamveil.Blockchain.AVERAGE_TIME_PER_BLOCK * wait_parameter
                         result_time = self.block_times[-1] - self.block_times[0]
                         time_ratio = average_time / result_time
                         new_pow_exponent = round(math.log2(time_ratio * self.difficulty_target))
-                        dreamnail.singleton.log(f"Recalculated difficulty target. (avg. dt = {result_time / dreamnail.Server.TRUST_MULTIPLIER})")
+                        dreamnail.singleton.log(f"Recalculated difficulty target. (avg. dt = {result_time / wait_parameter})")
                         self.difficulty_target = 2**new_pow_exponent
                         dreamnail.singleton.application_config["SERVER"]["difficulty_target"] = str(2**new_pow_exponent)
                         self.block_times = [self.block_times[-1]]
