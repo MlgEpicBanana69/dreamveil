@@ -254,14 +254,16 @@ class dreamnail:
                         self.hashrate = str(hash_speed)
                         start_time = timeit.default_timer()
                         hash_count = 0
+            except Exception as err:
+                dreamnail.singleton.log(f"Error in miner thread: {type(err)}: {err.args}")
             finally:
                 dreamnail.singleton.log("Miner is now shutdown.")
 
         def start_miner(self):
             if not self.miner_open:
+                self.miner_open = True
                 self.miner_thread = threading.Thread(target=self.miner)
                 self.miner_thread.start()
-                self.miner_open = True
 
         def close_miner(self):
             if self.miner_open:
