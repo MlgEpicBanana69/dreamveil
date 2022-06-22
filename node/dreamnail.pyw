@@ -720,6 +720,7 @@ class dreamnail:
         self.exited = False
         atexit.register(self.exit_handler)
 
+        self.log_queue = []
         self.app = QApplication(sys.argv)
         self.win = QMainWindow()
         self.ui = dreamui.Ui_MainWindow()
@@ -1085,6 +1086,8 @@ class dreamnail:
                 self.updateServerTab()
             case 5: # Miner tab
                 self.updateMinerTab()
+            case 7: # Log tab
+                self.updateLogTab()
 
     def tabWidget_currentChanged(self):
         match self.ui.tabWidget.currentIndex():
@@ -1103,7 +1106,7 @@ class dreamnail:
             case 6: # Transaction editor tab
                 self.updateTransactionEditorTab()
             case 7: # Log tab
-                pass
+                self.updateLogTab()
     #endregion
 
     #region Tab updates
@@ -1200,6 +1203,11 @@ class dreamnail:
 
     def updateServerTab(self):
         self.ui.difficultyTargetLabel.setText(str(int(math.log2(int(self.application_config["SERVER"]["difficulty_target"])))))
+
+    def updateLogTab(self):
+        for message in self.log_queue:
+            self.ui.logTextBrowser.append(f"{message}")
+        self.log_queue = []
     #endregion
 
     def open_server(self):
@@ -1230,7 +1238,7 @@ class dreamnail:
 
     def log(self, message):
         print(message)
-        self.ui.logTextBrowser.append(f"{message}")
+        self.log_queue.append(message)
 
     def exit_handler(self):
         if not self.exited:
