@@ -1034,6 +1034,7 @@ class dreamnail:
             dreamveil.address_to_key(output_address)
             assert output_address not in self.edited_transaction.outputs
             assert output_address != dreamveil.key_to_address(self.user_data["key"])
+            assert len(output_address) == 600
             output_address_valid = True
         except (ValueError, AssertionError):
             if output_address != "MINER" or self.edited_transaction.get_miner_fee() != 0:
