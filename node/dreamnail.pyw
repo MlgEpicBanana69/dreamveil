@@ -332,6 +332,7 @@ class dreamnail:
         HEADER_LEN = len(str(dreamveil.Block.MAX_SIZE))
         MAX_MESSAGE_SIZE = HEADER_LEN + dreamveil.Block.MAX_SIZE
         connection_lock = threading.Lock()
+        chnsyn_lock = threading.Lock()
 
         def __init__(self, socket, address):
             dreamnail.Connection.connection_lock.acquire()
@@ -525,65 +526,69 @@ class dreamnail:
             my_chain_mass = dreamnail.Server.singleton.blockchain.mass
             my_chain_len = len(dreamnail.Server.singleton.blockchain.chain)
 
-            if peer_chain_mass >= my_chain_mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_MULTIPLIER:
-                # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
-                self.send(f"{my_chain_mass} {my_chain_len}")
-                assert self.read_last_message() == "ACK"
-                hash_batches_sent = 0
-                split_index = "continue"
-                while split_index == "continue":
-                    # We send a block hash batch to the peer (max length 100)
-                    # The peer will match the hashes against his own chain to find where they split
-                    # Repeats this proccess until the split is found.
-                    # split_index: index on the chain where the blocks are different but on split_index-1 are the same for both chains.
-                    hash_batch = [block.block_hash for block in dreamnail.Server.singleton.blockchain.chain[::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
-                    hash_batch = hash_batch[::-1]
-                    self.send(" ".join(hash_batch))
-                    split_index = self.read_last_message()
-                split_index = int(split_index)
-                assert split_index >= 0 and split_index <= my_chain_len
-                form_new_chain = split_index < my_chain_len and my_chain_len != 0
-
-                # Create the new blockchain object and fill in the known blocks
-                if form_new_chain:
-                    new_blockchain = dreamveil.Blockchain()
-                    for i in range(split_index):
-                        new_blockchain.chain_block(dreamnail.Server.singleton.blockchain.chain[i])
-                else:
-                    new_blockchain = dreamnail.Server.singleton.blockchain
-
-                self.send("start")
-                # Download all the blocks mentioned in the inventory list from the peer
+            if peer_chain_mass >= my_chain_mass + dreamnail.Server.singleton.difficulty_target * dreamnail.Server.TRUST_MULTIPLIER and not dreamnail.Connection.chnsyn_lock.locked():
+                dreamnail.Connection.chnsyn_lock.acquire()
                 try:
-                    while new_blockchain.mass != peer_chain_mass:
-                        new_bk = dreamveil.Block.loads(self.read_last_message())
-                        chain_result = new_blockchain.chain_block(new_bk)
+                    # Locate the split where the current blockchain is different from the proposed blockchain by the peer.
+                    self.send(f"{my_chain_mass} {my_chain_len}")
+                    assert self.read_last_message() == "ACK"
+                    hash_batches_sent = 0
+                    split_index = "continue"
+                    while split_index == "continue":
+                        # We send a block hash batch to the peer (max length 100)
+                        # The peer will match the hashes against his own chain to find where they split
+                        # Repeats this proccess until the split is found.
+                        # split_index: index on the chain where the blocks are different but on split_index-1 are the same for both chains.
+                        hash_batch = [block.block_hash for block in dreamnail.Server.singleton.blockchain.chain[::-1][100*hash_batches_sent:100*(hash_batches_sent+1)]]
+                        hash_batch = hash_batch[::-1]
+                        self.send(" ".join(hash_batch))
+                        split_index = self.read_last_message()
+                    split_index = int(split_index)
+                    assert split_index >= 0 and split_index <= my_chain_len
+                    form_new_chain = split_index < my_chain_len and my_chain_len != 0
 
-                        if chain_result:
-                            self.send("continue")
-                        else:
-                            dreamnail.singleton.log(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
-                            if form_new_chain and not new_blockchain is dreamnail.Server.singleton.blockchain:
-                                del new_blockchain
-                            self.close()
-                            return
+                    # Create the new blockchain object and fill in the known blocks
+                    if form_new_chain:
+                        new_blockchain = dreamveil.Blockchain()
+                        for i in range(split_index):
+                            new_blockchain.chain_block(dreamnail.Server.singleton.blockchain.chain[i])
+                    else:
+                        new_blockchain = dreamnail.Server.singleton.blockchain
 
-                    # We swap the blockchain objects to the new larger one.
-                    new_blockchain.tracklist = dreamnail.Server.singleton.blockchain.tracklist.copy()
-                    dreamnail.singleton.blockchain = new_blockchain
-                    dreamnail.Server.singleton.blockchain = dreamnail.singleton.blockchain
+                    self.send("start")
+                    # Download all the blocks mentioned in the inventory list from the peer
+                    try:
+                        while new_blockchain.mass != peer_chain_mass:
+                            new_bk = dreamveil.Block.loads(self.read_last_message())
+                            chain_result = new_blockchain.chain_block(new_bk)
 
-                    # Remove all of the outdated pool transactions
-                    for block in new_blockchain.chain:
-                        for transaction in block.transactions:
-                            dreamnail.Server.singleton.remove_from_transaction_pool(transaction.signature)
+                            if chain_result:
+                                self.send("continue")
+                            else:
+                                dreamnail.singleton.log(f"!!! Block recieved in CHNSYN from ({self.address}) failed to chain. Using new blockchain: {form_new_chain}.")
+                                if form_new_chain and not new_blockchain is dreamnail.Server.singleton.blockchain:
+                                    del new_blockchain
+                                self.close()
+                                return
 
-                    dreamnail.singleton.log(f"### With ({self.address}) finished syncing new chain with mass {dreamnail.Server.singleton.blockchain.mass} and length {len(dreamnail.Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
-                except Exception as err:
-                    dreamnail.singleton.log(f"!!! Error {err} while getting blocks from peer in CHNSYN ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
-                    if form_new_chain and not new_blockchain is dreamnail.Server.singleton.blockchain:
-                        del new_blockchain
-                    return False
+                        # We swap the blockchain objects to the new larger one.
+                        new_blockchain.tracklist = dreamnail.Server.singleton.blockchain.tracklist.copy()
+                        dreamnail.singleton.blockchain = new_blockchain
+                        dreamnail.Server.singleton.blockchain = dreamnail.singleton.blockchain
+
+                        # Remove all of the outdated pool transactions
+                        for block in new_blockchain.chain:
+                            for transaction in block.transactions:
+                                dreamnail.Server.singleton.remove_from_transaction_pool(transaction.signature)
+
+                        dreamnail.singleton.log(f"### With ({self.address}) finished syncing new chain with mass {dreamnail.Server.singleton.blockchain.mass} and length {len(dreamnail.Server.singleton.blockchain.chain)} (old: {my_chain_mass})")
+                    except Exception as err:
+                        dreamnail.singleton.log(f"!!! Error {err} while getting blocks from peer in CHNSYN ({self.address}). specified: {peer_chain_mass.mass} given: {new_blockchain.mass}")
+                        if form_new_chain and not new_blockchain is dreamnail.Server.singleton.blockchain:
+                            del new_blockchain
+                        return False
+                finally:
+                    dreamnail.Connection.chnsyn_lock.release()
             else:
                 # We are not interested in the chain of the peer.
                 self.send("False")
