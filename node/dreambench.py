@@ -74,7 +74,7 @@ def write_peer_pool_file(peer_pool:dict):
 def write_transaction_pool_file(transaction_pool:list):
     output = []
     for i in range(len(transaction_pool)):
-        output[i] = dreamveil.Transaction.dumps(transaction_pool[i])
+        output.append(dreamveil.Transaction.dumps(transaction_pool[i]))
     with open(APPLICATION_PATH + "\\bench\\transaction_pool.json", "w") as transaction_pool_file:
         transaction_pool_file.write(json.dumps(output))
 
