@@ -1,2 +1,0 @@
-https://datatracker.ietf.org/doc/html/rfc8018
-https://www.coursera.org/learn/crypto
