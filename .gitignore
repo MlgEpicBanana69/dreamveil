@@ -157,4 +157,4 @@ cython_debug/
 .qt_for_python/
 
 venv/
-venv/*
+.venv/
